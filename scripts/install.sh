@@ -125,7 +125,11 @@ EOF
   else
     ok "[scans] share already present — left unchanged"
   fi
-  testparm -s >/dev/null 2>&1 && systemctl restart smbd || warn "testparm reported issues; check smb.conf"
+  if testparm -s >/dev/null 2>&1; then
+    systemctl restart smbd
+  else
+    warn "testparm reported issues; check smb.conf"
+  fi
 else
   warn "Samba not installed — skipping share setup"
 fi

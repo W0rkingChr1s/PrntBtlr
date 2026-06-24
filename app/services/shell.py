@@ -35,9 +35,7 @@ class CommandError(RuntimeError):
     def __init__(self, result: Result, cmd: list[str]):
         self.result = result
         self.cmd = cmd
-        super().__init__(
-            f"`{' '.join(cmd)}` failed ({result.returncode}): {result.output}"
-        )
+        super().__init__(f"`{' '.join(cmd)}` failed ({result.returncode}): {result.output}")
 
 
 def which(binary: str) -> str | None:

@@ -1,0 +1,65 @@
+name: 🐛 Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug! Please fill in as much as you can.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+      placeholder: When I press the scan button, no PDF appears in /srv/scans…
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to Printers → Add printer
+        2. Select '…'
+        3. See error
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Printing (CUPS)
+        - Scanning (SANE / button)
+        - Web panel / UI
+        - Install / deployment
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: hardware
+    attributes:
+      label: Printer / scanner model
+      placeholder: Canon PIXMA MX870
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Pi model, and PrntBtlr version (footer of the panel).
+      placeholder: |
+        - OS: Raspberry Pi OS Bookworm (64-bit)
+        - Pi: Raspberry Pi 4B
+        - PrntBtlr: v0.1.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: "Output of `journalctl -u prntbtlr -e` and/or browser console. Will be rendered as code."
+      render: shell

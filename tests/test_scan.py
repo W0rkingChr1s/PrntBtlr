@@ -7,9 +7,7 @@ from app.services import scan
 def test_list_devices_parses_scanimage(monkeypatch):
     out = "device `pixma:MX870_1A2B3C' is a CANON Canon PIXMA MX870 multi-function peripheral\n"
     monkeypatch.setattr(scan.shell, "which", lambda b: "/usr/bin/scanimage")
-    monkeypatch.setattr(
-        scan.shell, "run", lambda cmd, **k: scan.shell.Result(True, 0, out, "")
-    )
+    monkeypatch.setattr(scan.shell, "run", lambda cmd, **k: scan.shell.Result(True, 0, out, ""))
     devices = scan.list_devices()
     assert len(devices) == 1
     assert devices[0].device == "pixma:MX870_1A2B3C"

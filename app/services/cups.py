@@ -14,15 +14,11 @@ from ..config import settings
 from . import shell
 
 # ``printer NAME is idle.  enabled since ...`` / ``... is processing ...`` etc.
-_STATE_RE = re.compile(
-    r"^printer\s+(?P<name>\S+)\s+is\s+(?P<state>\w+)\.?\s*(?P<rest>.*)$"
-)
+_STATE_RE = re.compile(r"^printer\s+(?P<name>\S+)\s+is\s+(?P<state>\w+)\.?\s*(?P<rest>.*)$")
 # ``device for NAME: usb://...``
 _DEVICE_RE = re.compile(r"^device for (?P<name>\S+):\s*(?P<uri>.+)$")
 # A queued job line from ``lpstat -o``: ``MX870-7  pi  4096  Wed ...``
-_JOB_RE = re.compile(
-    r"^(?P<id>\S+)\s+(?P<user>\S+)\s+(?P<size>\d+)\s+(?P<when>.+)$"
-)
+_JOB_RE = re.compile(r"^(?P<id>\S+)\s+(?P<user>\S+)\s+(?P<size>\d+)\s+(?P<when>.+)$")
 
 
 @dataclass
@@ -249,9 +245,7 @@ def add_printer(
     res = shell.run(cmd)
     if res.ok and retry:
         # Crucial: don't stop the whole queue on a single error — retry instead.
-        shell.run(
-            [settings.cups_lpadmin, "-p", name, "-o", "printer-error-policy=retry-job"]
-        )
+        shell.run([settings.cups_lpadmin, "-p", name, "-o", "printer-error-policy=retry-job"])
     return res
 
 
@@ -267,9 +261,7 @@ def set_enabled(name: str, enabled: bool) -> shell.Result:
 def set_error_policy(name: str, policy: str) -> shell.Result:
     if policy not in {"retry-job", "retry-current-job", "abort-job", "stop-printer"}:
         return shell.Result(False, 1, "", f"invalid error policy: {policy}")
-    return shell.run(
-        [settings.cups_lpadmin, "-p", name, "-o", f"printer-error-policy={policy}"]
-    )
+    return shell.run([settings.cups_lpadmin, "-p", name, "-o", f"printer-error-policy={policy}"])
 
 
 def cancel_job(job_id: str) -> shell.Result:
