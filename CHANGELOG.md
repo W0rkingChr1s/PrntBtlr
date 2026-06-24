@@ -7,10 +7,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Blank-system bootstrap: `scripts/bootstrap.sh` one-liner that installs git,
+  clones the repo, and runs the installer (`curl … | sudo bash`).
+- Expanded `install.sh` for a turnkey install on a fresh box:
+  - pre-flight checks (root, OS, architecture, network, Python ≥ 3.9, port use);
+  - installs all printer drivers + helper tools, not just Gutenprint;
+  - adds the service user to `lpadmin`/`lp`/`scanner` groups;
+  - USB auto-suspend disabled for all common printer brands (not just Canon);
+  - firewall opening via `ufw` (80, 631, 5353/mDNS, Samba) when active;
+  - enables every service on boot (incl. `nmbd`) and seeds `scanbd`;
+  - error trap with line numbers, install log at `/var/log/prntbtlr-install.log`,
+    and a post-start health check against `/healthz`;
+  - configurable `PORT`, `NO_FIREWALL` flags; re-run doubles as the upgrade path.
 - GitHub project scaffolding for public operation: CI (ruff lint + format,
   pytest matrix on Python 3.9–3.12, shellcheck, Docker build), Dependabot,
   issue/PR templates, `CONTRIBUTING`, `SECURITY`, `CODE_OF_CONDUCT`, `LICENSE`,
   `.editorconfig`, and a `Makefile`.
+
+### Changed
+- USB no-autosuspend rule renamed `50-canon-…` → `50-prntbtlr-noautosuspend.rules`
+  (the installer removes the old file automatically).
 
 ## [0.1.0] - 2026-06-24
 
