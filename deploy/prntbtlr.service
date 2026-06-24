@@ -1,0 +1,27 @@
+# PrntBtlr control panel — systemd unit
+#
+# Installed to /etc/systemd/system/prntbtlr.service by scripts/install.sh.
+# Runs as root because it drives CUPS (lpadmin/cupsenable), SANE and systemctl,
+# all of which need privileges. On a single-purpose home print server this is
+# the pragmatic choice; see README "Security" for hardening notes.
+
+[Unit]
+Description=PrntBtlr — Raspberry Pi print & scan control panel
+After=network-online.target cups.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/prntbtlr
+Environment=PRNTBTLR_PORT=80
+EnvironmentFile=-/etc/prntbtlr/prntbtlr.env
+ExecStart=/opt/prntbtlr/.venv/bin/python -m app.main
+Restart=on-failure
+RestartSec=3
+
+# Binding port 80 only needs this capability, not full root networking.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

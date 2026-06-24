@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}System{% endblock %}
+{% block heading %}System{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h2>Services</h2>
+  <table>
+    <thead><tr><th>Service</th><th>Status</th><th>On boot</th><th></th></tr></thead>
+    <tbody>
+    {% for s in services %}
+      <tr>
+        <td><strong>{{ s.name }}</strong></td>
+        <td>
+          {% if s.status == 'active' %}<span class="badge ok">active</span>
+          {% elif s.status == 'not-installed' %}<span class="badge plain">not installed</span>
+          {% elif s.status == 'failed' %}<span class="badge bad">failed</span>
+          {% else %}<span class="badge warn">{{ s.status }}</span>{% endif %}
+        </td>
+        <td class="muted">{{ 'yes' if s.enabled else 'no' }}</td>
+        <td style="text-align:right">
+          {% if s.status != 'not-installed' %}
+          <form class="inline" method="post" action="/system/services/{{ s.name }}/restart">
+            <button class="btn sm">Restart</button></form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card gap">
+  <h2>Host</h2>
+  <table>
+    <tbody>
+      <tr><td class="muted">Hostname</td><td>{{ host.hostname }}</td></tr>
+      <tr><td class="muted">IP address</td><td class="mono">{{ host.ip }}</td></tr>
+      <tr><td class="muted">Control panel</td><td class="mono">http://{{ host.ip }}/</td></tr>
+      <tr><td class="muted">Operating system</td><td>{{ host.os }}</td></tr>
+      <tr><td class="muted">Kernel</td><td class="mono">{{ host.kernel }}</td></tr>
+      <tr><td class="muted">Scan folder</td><td class="mono">{{ host.scan_dir }}</td></tr>
+      <tr><td class="muted">Storage</td><td>{{ host.scan_dir_free }} free of {{ host.scan_dir_total }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card gap">
+  <h2>Useful links</h2>
+  <div class="btn-row">
+    <a class="btn sm" href="https://localhost:631" target="_blank">CUPS admin (:631)</a>
+    <a class="btn sm" href="/healthz" target="_blank">Health check</a>
+  </div>
+  <div class="help gap">The native CUPS admin runs on port 631 and is handy for deep
+    driver/PPD tweaks. PrntBtlr covers everyday tasks here.</div>
+</div>
+{% endblock %}

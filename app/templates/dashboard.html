@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block actions %}
+  <a class="btn ghost sm" href="/printers">Manage printers</a>
+  <a class="btn primary sm" href="/scans">Scan now</a>
+{% endblock %}
+
+{% block content %}
+<div class="grid cols-4">
+  <div class="card stat">
+    <div class="spread"><span class="ico">🖨️</span></div>
+    <div class="num">{{ cups.printers | length }}</div>
+    <div class="label">Printer{{ '' if cups.printers|length == 1 else 's' }} configured</div>
+  </div>
+  <div class="card stat">
+    <div class="spread"><span class="ico">📥</span></div>
+    <div class="num">{{ cups.jobs | length }}</div>
+    <div class="label">Jobs in queue</div>
+  </div>
+  <div class="card stat">
+    <div class="spread"><span class="ico">📄</span></div>
+    <div class="num">{{ scans | length }}{{ '+' if scans|length == 5 else '' }}</div>
+    <div class="label">Recent scans</div>
+  </div>
+  <div class="card stat">
+    <div class="spread"><span class="ico">💾</span></div>
+    <div class="num">{{ host.scan_dir_free }}</div>
+    <div class="label">Free of {{ host.scan_dir_total }}</div>
+  </div>
+</div>
+
+<div class="grid cols-2 gap">
+  <div class="card">
+    <h2>Printers</h2>
+    {% if not cups.available %}
+      <p class="empty">CUPS is not installed. Run the installer to set it up.</p>
+    {% elif cups.printers %}
+      <table>
+        <tbody>
+        {% for p in cups.printers %}
+          <tr>
+            <td>
+              <strong>{{ p.name }}</strong>
+              {% if p.is_default %}<span class="badge plain idle">default</span>{% endif %}
+              <div class="muted mono">{{ p.uri or 'no device URI' }}</div>
+            </td>
+            <td style="text-align:right">
+              {% if not p.enabled %}<span class="badge bad">paused</span>
+              {% elif p.state == 'idle' %}<span class="badge ok">idle</span>
+              {% elif p.state == 'processing' %}<span class="badge idle">printing</span>
+              {% else %}<span class="badge warn">{{ p.state }}</span>{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty"><div class="big">🖨️</div>No printers yet.
+        <div class="gap"><a class="btn primary sm" href="/printers/add">Add a printer</a></div></div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Services</h2>
+    <div id="services-panel">{% include "partials/services.html" %}</div>
+  </div>
+</div>
+
+<div class="grid cols-2 gap">
+  <div class="card">
+    <h2 class="spread"><span>Print queue</span></h2>
+    <div id="jobs-panel">{% include "partials/jobs.html" %}</div>
+  </div>
+
+  <div class="card">
+    <h2>Latest scans</h2>
+    {% if scans %}
+      <table>
+        <tbody>
+        {% for s in scans %}
+          <tr>
+            <td><a href="/scans/view/{{ s.name }}">{{ s.name }}</a>
+              <div class="muted">{{ s.modified_human }}</div></td>
+            <td style="text-align:right" class="muted">{{ s.size_human }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty"><div class="big">📄</div>No scans yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card gap">
+  <h2>Host <span class="sub">— {{ host.hostname }}</span></h2>
+  <table>
+    <tbody>
+      <tr><td class="muted">Address</td><td class="mono">{{ host.ip }}</td></tr>
+      <tr><td class="muted">OS</td><td>{{ host.os }}</td></tr>
+      <tr><td class="muted">Kernel</td><td class="mono">{{ host.kernel }}</td></tr>
+      <tr><td class="muted">Scan folder</td><td class="mono">{{ host.scan_dir }}</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  PrntBtlr.poll("/partials/services", "services-panel", 10000);
+  PrntBtlr.poll("/partials/jobs", "jobs-panel", 7000);
+</script>
+{% endblock %}
