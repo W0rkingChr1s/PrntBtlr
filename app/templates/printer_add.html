@@ -9,8 +9,10 @@
     <div class="field">
       <label for="name">Queue name</label>
       <input type="text" id="name" name="name" placeholder="MX870" required
-             pattern="[^\s]+" title="No spaces">
-      <div class="help">Short, space-free name. This is how the printer shows up on your devices.</div>
+             pattern="[A-Za-z0-9_][A-Za-z0-9_.\-]*"
+             title="Letters, digits, '.', '_' or '-'; no spaces and no leading '-'">
+      <div class="help">Letters, digits, <code>.</code> <code>_</code> <code>-</code> — no spaces.
+        This is how the printer shows up on your devices.</div>
     </div>
 
     <div class="field">
