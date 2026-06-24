@@ -296,16 +296,46 @@ ok "Python dependencies installed"
 
 # Environment file (preserve an existing one; only seed defaults once).
 mkdir -p "$ENV_DIR"
-if [ ! -f "$ENV_DIR/prntbtlr.env" ]; then
-  cat > "$ENV_DIR/prntbtlr.env" <<EOF
+ENV_FILE="$ENV_DIR/prntbtlr.env"
+if [ ! -f "$ENV_FILE" ]; then
+  cat > "$ENV_FILE" <<EOF
 # PrntBtlr environment overrides (KEY=VALUE). Restart after editing:
 #   sudo systemctl restart prntbtlr
 PRNTBTLR_PORT=$PORT
 PRNTBTLR_SCAN_DIR=$SCAN_DIR
 EOF
-  ok "Wrote $ENV_DIR/prntbtlr.env"
+  ok "Wrote $ENV_FILE"
 else
-  ok "Kept existing $ENV_DIR/prntbtlr.env"
+  ok "Kept existing $ENV_FILE"
+fi
+
+# --- Optional: enable login (ENABLE_AUTH=1) -------------------------------- #
+if [ "${ENABLE_AUTH:-0}" = "1" ]; then
+  step "Enabling panel authentication…"
+  AUTH_USER="${AUTH_USER:-admin}"
+  GENERATED_PW=""
+  if [ -z "${AUTH_PASSWORD:-}" ]; then
+    AUTH_PASSWORD="$("$APP_DIR/.venv/bin/python" -c 'import secrets; print(secrets.token_urlsafe(12))')"
+    GENERATED_PW="$AUTH_PASSWORD"
+  fi
+  # Hash the password and mint a session secret using the app's own helpers,
+  # so the plaintext password never lands in the env file.
+  PW_HASH="$(cd "$APP_DIR" && AUTH_PW="$AUTH_PASSWORD" .venv/bin/python -c \
+    'import os; from app.auth import hash_password; print(hash_password(os.environ["AUTH_PW"]))')"
+  SESSION_SECRET="$("$APP_DIR/.venv/bin/python" -c 'import secrets; print(secrets.token_urlsafe(48))')"
+  chmod 600 "$ENV_FILE"
+  # Upsert: drop any prior auth lines, then append the fresh ones.
+  sed -i '/^PRNTBTLR_AUTH_/d; /^PRNTBTLR_SESSION_SECRET=/d' "$ENV_FILE"
+  {
+    echo "PRNTBTLR_AUTH_ENABLED=true"
+    echo "PRNTBTLR_AUTH_USERNAME=$AUTH_USER"
+    echo "PRNTBTLR_AUTH_PASSWORD_HASH=$PW_HASH"
+    echo "PRNTBTLR_SESSION_SECRET=$SESSION_SECRET"
+  } >> "$ENV_FILE"
+  ok "Authentication enabled for user '$AUTH_USER' (secret + hash stored, file 0600)"
+  if [ -n "$GENERATED_PW" ]; then
+    AUTH_GENERATED_NOTICE="$GENERATED_PW"
+  fi
 fi
 
 # --------------------------------------------------------------------------- #
@@ -344,6 +374,14 @@ echo "${c_green}PrntBtlr is installed.${c_off}"
 echo "  Control panel:  http://${IP:-<pi-ip>}:$PORT/"
 echo "  Scans folder:   $SCAN_DIR   (share: smb://${IP:-<pi-ip>}/scans)"
 echo "  Install log:    $LOG_FILE"
+if [ "${ENABLE_AUTH:-0}" = "1" ]; then
+  echo "  Login:          user '${AUTH_USER:-admin}'"
+  if [ -n "${AUTH_GENERATED_NOTICE:-}" ]; then
+    echo
+    echo "${c_yellow}  ► Generated password: ${AUTH_GENERATED_NOTICE}${c_off}"
+    echo "    Save it now — it is NOT stored anywhere (only its hash is kept)."
+  fi
+fi
 echo
 echo "Next steps:"
 echo "  1. Open the panel and add your printer (Printers → Add printer)."

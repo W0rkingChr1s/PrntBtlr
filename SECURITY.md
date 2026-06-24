@@ -30,9 +30,13 @@ Please include:
 PrntBtlr is designed for a **trusted home LAN**, not direct internet exposure.
 Be aware of the following by design:
 
-- **No authentication** on the web panel. Anyone who can reach port 80 can manage
-  printers and scans. Put it behind a reverse proxy with auth, a VPN, or a
-  firewall rule before exposing it beyond your LAN.
+- **Authentication is opt-in.** By default the panel has no login — fine on a
+  trusted LAN, not for exposure. Turn on the built-in login before exposing it:
+  re-run the installer with `sudo ENABLE_AUTH=1 ./scripts/install.sh` (or set
+  `PRNTBTLR_AUTH_ENABLED`, `PRNTBTLR_AUTH_USERNAME`, `PRNTBTLR_AUTH_PASSWORD_HASH`
+  and `PRNTBTLR_SESSION_SECRET`). Passwords are stored as PBKDF2 hashes. Even
+  with login on, put TLS in front (reverse proxy) before any internet exposure —
+  the session cookie is sent in clear over plain HTTP.
 - **Runs as root** (systemd unit) because it drives CUPS, SANE and systemd, which
   need privileges. It only shells out via argument lists (never a shell), so
   printer/scanner names can't trigger shell injection.
