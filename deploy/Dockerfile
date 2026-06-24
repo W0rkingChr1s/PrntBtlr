@@ -7,7 +7,7 @@
 #
 # See deploy/docker-compose.yml for how to wire up CUPS, USB and the scan volume.
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # CLI tooling the app shells out to. cups-client gives lpstat/lpadmin/lpinfo/lp;
 # sane-utils gives scanimage; img2pdf assembles scanned PDFs.
