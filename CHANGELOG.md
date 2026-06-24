@@ -7,6 +7,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Opt-in panel authentication**: a session-cookie login (styled login page +
+  sign-out) guarding every page except `/login`, `/healthz` and static assets.
+  Off by default. Passwords are PBKDF2-hashed; `python -m app.auth hash|secret`
+  generates a hash / session secret. Installer flag `ENABLE_AUTH=1` (with
+  optional `AUTH_USER` / `AUTH_PASSWORD`) seeds the hash + session secret into a
+  `600` env file and prints a generated password when none is supplied.
 - Blank-system bootstrap: `scripts/bootstrap.sh` one-liner that installs git,
   clones the repo, and runs the installer (`curl … | sudo bash`).
 - Expanded `install.sh` for a turnkey install on a fresh box:

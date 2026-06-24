@@ -163,6 +163,19 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .gap { margin-top: 18px; }
 .section-title { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); margin: 28px 0 12px; }
 
+/* ---------- Login ---------- */
+.login-body {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 20px;
+}
+.login-card {
+  width: 100%; max-width: 380px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 32px; box-shadow: var(--shadow);
+}
+.login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.login-card .field:last-of-type { margin-bottom: 22px; }
+
 @media (max-width: 820px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; flex-direction: row; align-items: center; flex-wrap: wrap; }

@@ -47,6 +47,7 @@ Useful installer flags:
 | Command | Effect |
 |---------|--------|
 | `sudo PURGE_CANON=1 ./scripts/install.sh` | Also remove Canon proprietary drivers (a classic stuck-job cause). |
+| `sudo ENABLE_AUTH=1 ./scripts/install.sh` | Turn on the panel login (prints a generated password unless you pass `AUTH_PASSWORD=…`). |
 | `sudo PORT=8080 ./scripts/install.sh` | Serve the panel on a different port. |
 | `sudo NO_FIREWALL=1 ./scripts/install.sh` | Don't touch ufw. |
 | `sudo SKIP_APT=1 ./scripts/install.sh` | Re-deploy the app only (skip package install). |
@@ -140,8 +141,34 @@ Settings come from environment variables (prefix `PRNTBTLR_`) or
 | `PRNTBTLR_PORT` | `80` | Web panel port. |
 | `PRNTBTLR_SCAN_DIR` | `/srv/scans` | Where scans are saved & served from. |
 | `PRNTBTLR_DEBUG` | `false` | Verbose logging + autoreload. |
+| `PRNTBTLR_AUTH_ENABLED` | `false` | Require login to use the panel. |
+| `PRNTBTLR_AUTH_USERNAME` | `admin` | Login username. |
+| `PRNTBTLR_AUTH_PASSWORD_HASH` | — | PBKDF2 hash (preferred over plaintext). |
+| `PRNTBTLR_SESSION_SECRET` | — | Key that signs the session cookie. |
 
 Restart after changes: `sudo systemctl restart prntbtlr`.
+
+### Authentication (optional)
+
+The panel ships with an **opt-in login** — off by default so trusted-LAN setups
+just work. Easiest way to turn it on:
+
+```bash
+sudo ENABLE_AUTH=1 ./scripts/install.sh                 # generates a password
+sudo ENABLE_AUTH=1 AUTH_USER=me AUTH_PASSWORD=secret ./scripts/install.sh
+```
+
+The installer hashes the password (PBKDF2), mints a session secret, and writes
+both to `/etc/prntbtlr/prntbtlr.env` (mode `600`) — the plaintext password is
+never stored. To generate a hash yourself:
+
+```bash
+/opt/prntbtlr/.venv/bin/python -m app.auth hash    # prompts, prints the hash
+```
+
+> The login protects the UI, not the network: over plain HTTP the session cookie
+> travels in clear. For anything internet-facing, run it behind a TLS reverse
+> proxy. See [`SECURITY.md`](SECURITY.md).
 
 ---
 

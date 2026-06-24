@@ -27,7 +27,14 @@
         <a href="/system" class="{{ 'active' if nav_active == 'system' }}">
           <span class="ico">⚙</span> System</a>
       </nav>
-      <div class="sidebar-foot">v{{ version }}</div>
+      <div class="sidebar-foot">
+        {% if auth_enabled %}
+        <form method="post" action="/logout">
+          <button class="btn ghost sm" type="submit">⎋ Sign out</button>
+        </form>
+        {% endif %}
+        <span class="muted">v{{ version }}</span>
+      </div>
     </aside>
 
     <main class="content">

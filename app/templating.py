@@ -14,7 +14,11 @@ from .config import settings
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
-templates.env.globals.update(app_name=settings.app_name, version=__version__)
+templates.env.globals.update(
+    app_name=settings.app_name,
+    version=__version__,
+    auth_enabled=settings.auth_enabled,
+)
 
 
 def render(request: Request, name: str, **context):

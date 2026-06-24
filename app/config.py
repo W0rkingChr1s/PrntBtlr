@@ -29,6 +29,22 @@ class Settings(BaseSettings):
     app_name: str = "PrntBtlr"
     tagline: str = "Your Raspberry Pi print & scan butler"
 
+    # --- Authentication (opt-in) -----------------------------------------
+    # Off by default so existing trusted-LAN installs are unaffected. Enable it
+    # before exposing the panel beyond your LAN. When on, a password is required.
+    auth_enabled: bool = False
+    auth_username: str = "admin"
+    # Either a plaintext password (simplest) or a PBKDF2 hash produced by
+    # ``python -m app.auth hash`` (preferred — keeps the secret out of the env).
+    auth_password: str = ""
+    auth_password_hash: str = ""
+    # Secret used to sign the session cookie. Auto-seeded by the installer;
+    # if left empty while auth is on, a random per-process key is used (sessions
+    # then reset on restart).
+    session_secret: str = ""
+    # Session lifetime in seconds (default 7 days).
+    session_max_age: int = 7 * 24 * 3600
+
     # --- Filesystem -------------------------------------------------------
     # Where finished scans (PDFs) are written and served from.
     scan_dir: Path = Path("/srv/scans")
