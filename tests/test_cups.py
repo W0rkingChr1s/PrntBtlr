@@ -59,6 +59,22 @@ def test_set_error_policy_rejects_invalid():
     assert res.ok is False
 
 
+def test_is_valid_printer_name():
+    for good in ("MX870", "office_printer", "hp.laserjet", "p-1", "A", "_x"):
+        assert cups.is_valid_printer_name(good), good
+    for bad in (
+        "",
+        " ",
+        "has space",
+        "-leadingdash",
+        "with/slash",
+        "with#hash",
+        "tab\tname",
+        "x" * 200,
+    ):
+        assert not cups.is_valid_printer_name(bad), repr(bad)
+
+
 def test_status_reports_unavailable(monkeypatch):
     monkeypatch.setattr(cups.shell, "which", lambda b: None)
     st = cups.status()

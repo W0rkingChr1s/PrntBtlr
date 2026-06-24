@@ -20,6 +20,16 @@ _DEVICE_RE = re.compile(r"^device for (?P<name>\S+):\s*(?P<uri>.+)$")
 # A queued job line from ``lpstat -o``: ``MX870-7  pi  4096  Wed ...``
 _JOB_RE = re.compile(r"^(?P<id>\S+)\s+(?P<user>\S+)\s+(?P<size>\d+)\s+(?P<when>.+)$")
 
+# CUPS forbids spaces, '/', '#' and control chars in queue names. We go a little
+# stricter: letters, digits, dot, underscore, hyphen — and never a leading hyphen
+# (which lpadmin would otherwise mistake for a command-line flag).
+_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+
+
+def is_valid_printer_name(name: str) -> bool:
+    """True if *name* is a safe, CUPS-acceptable queue name."""
+    return bool(name) and len(name) <= 127 and _NAME_RE.match(name) is not None
+
 
 @dataclass
 class Printer:

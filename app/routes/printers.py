@@ -41,8 +41,12 @@ def add_printer(
     retry: bool = Form(True),
 ):
     name = name.strip()
-    if not name or " " in name:
-        return redirect("/printers/add", "Printer name must be non-empty and space-free.", "error")
+    if not cups.is_valid_printer_name(name):
+        return redirect(
+            "/printers/add",
+            "Invalid name. Use letters, digits, '.', '_' or '-' (no spaces, no leading '-').",
+            "error",
+        )
     res = cups.add_printer(name, uri.strip(), ppd.strip(), shared=shared, retry=retry)
     if res.ok:
         return redirect("/printers", f"Printer '{name}' created.")

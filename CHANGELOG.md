@@ -6,6 +6,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- Validate printer queue names (`[A-Za-z0-9_][A-Za-z0-9_.-]*`, no leading hyphen)
+  before they reach `lpadmin`, so a crafted name can't be mistaken for a flag.
+
 ### Added
 - **Opt-in panel authentication**: a session-cookie login (styled login page +
   sign-out) guarding every page except `/login`, `/healthz` and static assets.
