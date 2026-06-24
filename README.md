@@ -1,5 +1,10 @@
 # 🖨️ PrntBtlr
 
+[![CI](https://github.com/w0rkingchr1s/prntbtlr/actions/workflows/ci.yml/badge.svg)](https://github.com/w0rkingchr1s/prntbtlr/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 **Your Raspberry Pi print & scan butler.** Plug an old USB printer/scanner into a
 Raspberry Pi and PrntBtlr turns it into a modern, network-shared print + scan
 station — with a clean web control panel on **port 80** instead of fiddling on
@@ -163,6 +168,13 @@ Your scans in `/srv/scans` are left untouched.
 
 ---
 
+## Contributing
+
+Contributions are welcome! See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the dev
+setup and workflow, and please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Found a security issue? See [`SECURITY.md`](SECURITY.md) — don't open a public
+issue. Changes are tracked in [`CHANGELOG.md`](CHANGELOG.md).
+
 ## License
 
-MIT — see [`pyproject.toml`](pyproject.toml).
+MIT © Christoph Zeitler — see [`LICENSE`](LICENSE).

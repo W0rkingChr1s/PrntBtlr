@@ -66,9 +66,7 @@ def list_devices() -> list[ScanDevice]:
     for line in res.stdout.splitlines():
         m = _DEVICE_RE.search(line.strip())
         if m:
-            devices.append(
-                ScanDevice(device=m.group("dev"), description=m.group("desc").strip())
-            )
+            devices.append(ScanDevice(device=m.group("dev"), description=m.group("desc").strip()))
     return devices
 
 

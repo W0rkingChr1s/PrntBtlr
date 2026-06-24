@@ -13,8 +13,16 @@ def client():
 
 @pytest.mark.parametrize(
     "path",
-    ["/healthz", "/", "/printers", "/printers/add", "/scans", "/system",
-     "/partials/services", "/partials/jobs"],
+    [
+        "/healthz",
+        "/",
+        "/printers",
+        "/printers/add",
+        "/scans",
+        "/system",
+        "/partials/services",
+        "/partials/jobs",
+    ],
 )
 def test_pages_render(client, path):
     assert client.get(path).status_code == 200
