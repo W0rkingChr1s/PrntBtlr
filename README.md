@@ -23,7 +23,16 @@ tasks in a friendly UI:
 
 ## Quick start
 
-On a Raspberry Pi (Raspberry Pi OS / Debian) with the printer connected by USB:
+The installer assumes a **blank system** (a fresh Raspberry Pi OS / Debian box)
+and brings everything it needs. Connect the printer by USB, then either:
+
+**One-liner** (truly blank box — installs git, clones, installs):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/w0rkingchr1s/prntbtlr/main/scripts/bootstrap.sh | sudo bash
+```
+
+**Or from a clone:**
 
 ```bash
 git clone https://github.com/w0rkingchr1s/prntbtlr.git
@@ -33,21 +42,35 @@ sudo ./scripts/install.sh
 
 Then open **`http://<pi-ip>/`** and add your printer under **Printers → Add printer**.
 
-> Already have stuck jobs from Canon's proprietary drivers? Run the installer with
-> `sudo PURGE_CANON=1 ./scripts/install.sh` to remove them first.
+Useful installer flags:
+
+| Command | Effect |
+|---------|--------|
+| `sudo PURGE_CANON=1 ./scripts/install.sh` | Also remove Canon proprietary drivers (a classic stuck-job cause). |
+| `sudo PORT=8080 ./scripts/install.sh` | Serve the panel on a different port. |
+| `sudo NO_FIREWALL=1 ./scripts/install.sh` | Don't touch ufw. |
+| `sudo SKIP_APT=1 ./scripts/install.sh` | Re-deploy the app only (skip package install). |
 
 ### What the installer does
 
-1. Installs CUPS + Gutenprint, Avahi (AirPrint), SANE + scanbd, Samba and Python.
-2. Creates the shared scan folder `/srv/scans` and a Samba `[scans]` share.
-3. Disables USB auto-suspend for the printer (a classic "jobs vanish" cause).
-4. Installs the button-scan handler (`scan2pdf.sh`) for scanbd.
-5. Enables printer sharing + Bonjour so AirPrint works.
-6. Deploys the control panel to `/opt/prntbtlr` and runs it as a systemd service
-   on port 80.
+1. **Pre-flight checks** — root, supported OS, architecture, network, Python ≥ 3.9,
+   and whether the target port is already taken.
+2. Installs **everything**: CUPS + Gutenprint + all printer drivers, Avahi
+   (AirPrint), SANE + scanbd, Samba, Python, and helper tools.
+3. Adds the service user to the `lpadmin`/`lp`/`scanner` groups.
+4. Creates the shared scan folder `/srv/scans` and a Samba `[scans]` share.
+5. Disables USB auto-suspend for **all common printer brands** (Canon, Epson, HP,
+   Brother, Samsung, …) — a classic "jobs vanish" cause.
+6. Installs the button-scan handler (`scan2pdf.sh`) for scanbd.
+7. Enables printer sharing + Bonjour so AirPrint works.
+8. Opens the firewall (ports 80, 631, 5353, Samba) **if `ufw` is active**.
+9. Enables every service on boot (cups, avahi, smbd, nmbd, scanbd, prntbtlr).
+10. Deploys the control panel to `/opt/prntbtlr` in a venv, runs it as a systemd
+    service, and **verifies the panel actually answers** before declaring success.
 
-Every config file it touches is backed up as `<file>.bak.<timestamp>` first, and
-the script is safe to re-run.
+Every config file it touches is backed up as `<file>.bak.<timestamp>` first, the
+script is **idempotent** (re-running is also the upgrade path), and the full
+output is logged to `/var/log/prntbtlr-install.log`.
 
 ### One manual step: the scan button
 

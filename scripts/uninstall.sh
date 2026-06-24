@@ -16,11 +16,12 @@ rm -f /etc/systemd/system/prntbtlr.service
 systemctl daemon-reload
 
 echo "==> Removing application files…"
-rm -rf /opt/prntbtlr
+rm -rf /opt/prntbtlr /opt/prntbtlr-src
 
 if [ "${PURGE_CONFIG:-0}" = "1" ]; then
   echo "==> Removing PrntBtlr system config (udev rule, scan script, env)…"
-  rm -f /etc/udev/rules.d/50-canon-noautosuspend.rules
+  rm -f /etc/udev/rules.d/50-prntbtlr-noautosuspend.rules
+  rm -f /etc/udev/rules.d/50-canon-noautosuspend.rules  # legacy name
   rm -f /etc/scanbd/scripts/scan2pdf.sh
   rm -rf /etc/prntbtlr
   udevadm control --reload-rules 2>/dev/null || true
