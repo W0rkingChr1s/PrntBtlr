@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Add printer{% endblock %}
+{% block heading %}Add printer{% endblock %}
+{% block actions %}<a class="btn ghost sm" href="/printers">← Back</a>{% endblock %}
+
+{% block content %}
+<div class="card">
+  <form method="post" action="/printers/add">
+    <div class="field">
+      <label for="name">Queue name</label>
+      <input type="text" id="name" name="name" placeholder="MX870" required
+             pattern="[^\s]+" title="No spaces">
+      <div class="help">Short, space-free name. This is how the printer shows up on your devices.</div>
+    </div>
+
+    <div class="field">
+      <label for="uri">Device (USB connection)</label>
+      {% if devices %}
+        <select id="uri" name="uri" required>
+          {% for d in devices %}
+            <option value="{{ d.uri }}" {{ 'selected' if d.is_usb and loop.first }}>{{ d.uri }}</option>
+          {% endfor %}
+        </select>
+        <div class="help">Detected via <span class="mono">lpinfo -v</span>. Pick the
+          <span class="mono">usb://</span> entry for your printer.</div>
+      {% else %}
+        <input type="text" id="uri" name="uri" placeholder="usb://Canon/MX870%20series?serial=..." required>
+        <div class="help">No devices auto-detected — make sure the printer is on and plugged in,
+          then refresh. You can also paste the URI manually.</div>
+      {% endif %}
+    </div>
+
+    <div class="field">
+      <label for="ppd">Driver</label>
+      <input type="text" id="ppd" name="ppd" list="drivers" required
+             placeholder="gutenprint.5.3://bjc-MX870/expert">
+      <datalist id="drivers">
+        {% for d in drivers %}<option value="{{ d.ppd }}">{{ d.description }}</option>{% endfor %}
+      </datalist>
+      <div class="help">{{ drivers|length }} drivers available. Prefer a
+        <span class="mono">gutenprint</span> driver for old Canon/Epson/HP units —
+        type to filter, e.g. "mx870".</div>
+    </div>
+
+    <div class="field-row">
+      <label class="check"><input type="checkbox" name="shared" value="true" checked>
+        Share for AirPrint</label>
+      <label class="check"><input type="checkbox" name="retry" value="true" checked>
+        Retry jobs on error (recommended)</label>
+    </div>
+
+    <div class="btn-row gap">
+      <button class="btn primary" type="submit">Create printer</button>
+      <a class="btn ghost" href="/printers">Cancel</a>
+    </div>
+  </form>
+</div>
+
+{% if not drivers %}
+<div class="card gap"><div class="empty">
+  No drivers found. Install Gutenprint first:
+  <div class="mono gap">sudo apt install printer-driver-gutenprint</div></div></div>
+{% endif %}
+{% endblock %}

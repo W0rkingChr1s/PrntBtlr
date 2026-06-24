@@ -1,0 +1,16 @@
+<table>
+  <tbody>
+  {% for s in services %}
+    <tr>
+      <td><strong>{{ s.name }}</strong></td>
+      <td style="text-align:right">
+        {% if s.status == 'active' %}<span class="badge ok">active</span>
+        {% elif s.status == 'not-installed' %}<span class="badge plain">not installed</span>
+        {% elif s.status == 'failed' %}<span class="badge bad">failed</span>
+        {% else %}<span class="badge warn">{{ s.status }}</span>{% endif %}
+        {% if s.enabled %}<span class="badge plain" title="Starts on boot">boot</span>{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>

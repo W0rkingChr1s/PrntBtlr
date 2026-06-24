@@ -1,0 +1,21 @@
+{% if jobs %}
+  <table>
+    <thead><tr><th>Job</th><th>User</th><th>Size</th><th></th></tr></thead>
+    <tbody>
+    {% for j in jobs %}
+      <tr>
+        <td class="mono">{{ j.id }}<div class="muted">{{ j.when }}</div></td>
+        <td>{{ j.user }}</td>
+        <td class="muted">{{ (j.size / 1024) | round(0) | int }} KB</td>
+        <td style="text-align:right">
+          <form class="inline" method="post" action="/printers/jobs/{{ j.id }}/cancel">
+            <button class="btn danger sm">Cancel</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <div class="empty">Queue is empty — nothing waiting to print.</div>
+{% endif %}

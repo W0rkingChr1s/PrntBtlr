@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Scans{% endblock %}
+{% block heading %}Scans{% endblock %}
+
+{% block content %}
+<div class="grid cols-2">
+  <div class="card">
+    <h2>Scan now</h2>
+    {% if not available %}
+      <div class="empty">SANE (<span class="mono">scanimage</span>) is not installed.</div>
+    {% else %}
+      <form method="post" action="/scans/new">
+        <div class="field">
+          <label for="device">Scanner</label>
+          {% if devices %}
+            <select id="device" name="device">
+              {% for d in devices %}<option value="{{ d.device }}">{{ d.description or d.device }}</option>{% endfor %}
+            </select>
+          {% else %}
+            <input type="text" id="device" name="device" placeholder="pixma">
+            <div class="help">No scanner auto-detected. Make sure it's connected; the
+              button-scan flow may have grabbed the device.</div>
+          {% endif %}
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="source">Source</label>
+            <select id="source" name="source">
+              <option value="Flatbed">Flatbed (glass)</option>
+              <option value="Automatic Document Feeder">Document feeder (ADF)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="mode">Mode</label>
+            <select id="mode" name="mode">
+              <option value="Color">Color</option>
+              <option value="Gray">Grayscale</option>
+              <option value="Lineart">Black &amp; white</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="resolution">Resolution (DPI)</label>
+          <select id="resolution" name="resolution">
+            <option value="150">150 — draft</option>
+            <option value="300" selected>300 — standard</option>
+            <option value="600">600 — high</option>
+          </select>
+        </div>
+        <button class="btn primary" type="submit">📄 Scan</button>
+        <div class="help gap">A single page is scanned and saved as PDF. The hardware
+          scan button still works independently and saves multi-page PDFs.</div>
+      </form>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>How the scan button works</h2>
+    <p class="muted">Press the scan button on the printer and <strong>scanbd</strong>
+      runs <span class="mono">scan2pdf.sh</span>: it scans (ADF if loaded, otherwise
+      the glass), builds a PDF, and drops it into the shared folder below.</p>
+    <table class="gap">
+      <tbody>
+        <tr><td class="muted">Save folder</td><td class="mono">/srv/scans</td></tr>
+        <tr><td class="muted">Network share</td><td class="mono">smb://&lt;pi&gt;/scans</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card gap">
+  <div class="spread">
+    <h2 style="margin:0">Saved scans <span class="sub">— {{ scans|length }} file{{ '' if scans|length == 1 else 's' }}</span></h2>
+  </div>
+  {% if scans %}
+    <table class="gap">
+      <thead><tr><th>File</th><th>Date</th><th>Size</th><th></th></tr></thead>
+      <tbody>
+      {% for s in scans %}
+        <tr>
+          <td><a href="/scans/view/{{ s.name }}" target="_blank">{{ s.name }}</a></td>
+          <td class="muted">{{ s.modified_human }}</td>
+          <td class="muted">{{ s.size_human }}</td>
+          <td style="text-align:right">
+            <div class="btn-row" style="justify-content:flex-end">
+              <a class="btn sm" href="/scans/file/{{ s.name }}">Download</a>
+              <form class="inline" method="post" action="/scans/file/{{ s.name }}/delete"
+                    onsubmit="return confirm('Delete {{ s.name }}?')">
+                <button class="btn danger sm">Delete</button></form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty"><div class="big">📄</div>No scans saved yet.</div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app_name }}{% endblock %} · {{ app_name }}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">🖨️</span>
+        <div>
+          <div class="brand-name">{{ app_name }}</div>
+          <div class="brand-tag">{{ tagline }}</div>
+        </div>
+      </div>
+      <nav>
+        <a href="/" class="{{ 'active' if nav_active == 'dashboard' }}">
+          <span class="ico">▦</span> Dashboard</a>
+        <a href="/printers" class="{{ 'active' if nav_active == 'printers' }}">
+          <span class="ico">🖨</span> Printers</a>
+        <a href="/scans" class="{{ 'active' if nav_active == 'scans' }}">
+          <span class="ico">📄</span> Scans</a>
+        <a href="/system" class="{{ 'active' if nav_active == 'system' }}">
+          <span class="ico">⚙</span> System</a>
+      </nav>
+      <div class="sidebar-foot">v{{ version }}</div>
+    </aside>
+
+    <main class="content">
+      {% if flash %}
+      <div class="flash flash-{{ flash.level }}" role="status">
+        {{ flash.message }}
+        <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+      </div>
+      {% endif %}
+
+      <header class="page-head">
+        <h1>{% block heading %}{% endblock %}</h1>
+        <div class="page-actions">{% block actions %}{% endblock %}</div>
+      </header>
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script src="/static/js/app.js" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
