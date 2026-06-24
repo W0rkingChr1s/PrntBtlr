@@ -1,3 +1,6 @@
 -r requirements.txt
-pytest>=9.1.1
+# pytest 9 dropped Python 3.9; keep a 3.9-compatible pin for that interpreter so
+# the CI matrix (which still covers 3.9 / Raspberry Pi OS Bullseye) stays green.
+pytest>=8.0,<9; python_version < "3.10"
+pytest>=9.1.1; python_version >= "3.10"
 httpx>=0.28.1
