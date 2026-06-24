@@ -47,6 +47,15 @@
             <option value="600">600 — high</option>
           </select>
         </div>
+        <div class="field">
+          {% if ocr_available %}
+          <label class="check"><input type="checkbox" name="ocr" value="true">
+            Searchable PDF (OCR)</label>
+          {% else %}
+          <label class="check"><input type="checkbox" disabled>
+            Searchable PDF (OCR) <span class="muted">— install ocrmypdf to enable</span></label>
+          {% endif %}
+        </div>
         <button class="btn primary" type="submit">📄 Scan</button>
         <div class="help gap">A single page is scanned and saved as PDF. The hardware
           scan button still works independently and saves multi-page PDFs.</div>

@@ -1,7 +1,57 @@
-"""Tests for scan device parsing and the path-traversal guard."""
+"""Tests for scan device parsing, OCR, and the path-traversal guard."""
+
+from pathlib import Path
 
 from app.config import settings
 from app.services import scan
+
+
+def test_ocr_available(monkeypatch):
+    monkeypatch.setattr(scan.shell, "which", lambda b: "/usr/bin/ocrmypdf")
+    assert scan.ocr_available() is True
+    monkeypatch.setattr(scan.shell, "which", lambda b: None)
+    assert scan.ocr_available() is False
+
+
+def _wire_fake_scan(monkeypatch, tmp_path, *, ocr_installed=True):
+    """Stub out scanimage + img2pdf (+ optionally ocrmypdf) with real file writes."""
+    monkeypatch.setattr(settings, "scan_dir", tmp_path)
+    monkeypatch.setattr(scan, "available", lambda: True)
+    monkeypatch.setattr(scan, "first_device", lambda: "pixma")
+
+    def fake_scan_to_file(cmd, dest):
+        Path(dest).write_bytes(b"II*\x00fake-tiff")
+        return scan.shell.Result(True, 0, "", "")
+
+    monkeypatch.setattr(scan, "_scan_to_file", fake_scan_to_file)
+    monkeypatch.setattr(
+        scan.shell,
+        "which",
+        lambda b: None if (b == "ocrmypdf" and not ocr_installed) else f"/usr/bin/{b}",
+    )
+
+    def fake_run(cmd, **k):
+        out = cmd[cmd.index("-o") + 1] if "-o" in cmd else cmd[-1]
+        Path(out).write_bytes(b"%PDF-1.4\n")
+        return scan.shell.Result(True, 0, "", "")
+
+    monkeypatch.setattr(scan.shell, "run", fake_run)
+
+
+def test_scan_now_with_ocr(tmp_path, monkeypatch):
+    _wire_fake_scan(monkeypatch, tmp_path, ocr_installed=True)
+    ok, msg, path = scan.scan_now(ocr=True)
+    assert ok and path is not None and path.exists()
+    assert "searchable" in msg
+    # No temp tiff left behind.
+    assert not list(tmp_path.glob("*.tiff"))
+
+
+def test_scan_now_ocr_requested_but_unavailable(tmp_path, monkeypatch):
+    _wire_fake_scan(monkeypatch, tmp_path, ocr_installed=False)
+    ok, msg, path = scan.scan_now(ocr=True)
+    assert ok and path is not None and path.exists()  # plain scan still saved
+    assert "OCR skipped" in msg
 
 
 def test_list_devices_parses_scanimage(monkeypatch):

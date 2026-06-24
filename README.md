@@ -48,6 +48,7 @@ Useful installer flags:
 |---------|--------|
 | `sudo PURGE_CANON=1 ./scripts/install.sh` | Also remove Canon proprietary drivers (a classic stuck-job cause). |
 | `sudo ENABLE_AUTH=1 ./scripts/install.sh` | Turn on the panel login (prints a generated password unless you pass `AUTH_PASSWORD=…`). |
+| `sudo ENABLE_OCR=1 ./scripts/install.sh` | Install OCR (ocrmypdf + tesseract) for searchable PDFs; `OCR_LANGS="eng deu"` adds languages. |
 | `sudo PORT=8080 ./scripts/install.sh` | Serve the panel on a different port. |
 | `sudo NO_FIREWALL=1 ./scripts/install.sh` | Don't touch ufw. |
 | `sudo SKIP_APT=1 ./scripts/install.sh` | Re-deploy the app only (skip package install). |
@@ -87,6 +88,12 @@ sudo systemctl enable --now scanbd
 
 Scanning from the **web panel** works without this — the button just adds the
 "press the hardware button" convenience.
+
+**Searchable PDFs (OCR).** Install OCR with `sudo ENABLE_OCR=1 ./scripts/install.sh`
+(add languages with `OCR_LANGS="eng deu"`). Then tick **Searchable PDF (OCR)** in
+the panel's scan form, or wire the MX870's **second** scan button to
+`scan2pdf-ocr.sh` (see [`config/scanbd-action.conf`](config/scanbd-action.conf))
+so one button gives a plain PDF and the other an OCR'd, searchable one.
 
 ---
 

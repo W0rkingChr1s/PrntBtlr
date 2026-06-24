@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     # Default SANE device fallback when none is auto-detected.
     default_scan_device: str = "pixma"
 
+    # OCR (searchable PDFs) via ocrmypdf. Language(s) for tesseract, e.g.
+    # "eng", "deu", or "deu+eng". Only used when OCR is requested and installed.
+    ocr_lang: str = "eng"
+
     # systemd units surfaced on the dashboard.
     services: tuple[str, ...] = ("cups", "scanbd", "smbd", "avahi-daemon")
 

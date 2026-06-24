@@ -135,6 +135,18 @@ if [ "${SKIP_APT:-0}" != "1" ]; then
     usbutils curl ca-certificates iproute2
   ok "Packages installed"
 
+  # Optional: OCR / searchable PDFs (heavier — language packs are big), opt-in.
+  if [ "${ENABLE_OCR:-0}" = "1" ]; then
+    step "Installing OCR (ocrmypdf + tesseract)…"
+    OCR_PKGS="ocrmypdf tesseract-ocr"
+    for lang in ${OCR_LANGS:-eng}; do
+      OCR_PKGS="$OCR_PKGS tesseract-ocr-$lang"
+    done
+    # shellcheck disable=SC2086
+    apt-get install -y --no-install-recommends $OCR_PKGS
+    ok "OCR installed (languages: ${OCR_LANGS:-eng})"
+  fi
+
   # Python must be >= 3.9 for the app.
   if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)'; then
     die "Python 3.9+ is required, found $(python3 -V 2>&1)."
@@ -206,7 +218,8 @@ if command -v scanbd >/dev/null 2>&1; then
 
   install -d /etc/scanbd/scripts
   install -m 0755 "$REPO_DIR/scripts/scan2pdf.sh" /etc/scanbd/scripts/scan2pdf.sh
-  ok "Installed /etc/scanbd/scripts/scan2pdf.sh"
+  install -m 0755 "$REPO_DIR/scripts/scan2pdf-ocr.sh" /etc/scanbd/scripts/scan2pdf-ocr.sh
+  ok "Installed scan2pdf.sh + scan2pdf-ocr.sh (second button → searchable PDF)"
   # Enable the service now; the action block (button name) is wired up by hand later.
   systemctl enable scanbd >/dev/null 2>&1 || true
   warn "Button name is hardware-specific — finish setup per config/scanbd-action.conf,"
