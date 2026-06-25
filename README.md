@@ -3,6 +3,7 @@
 [![CI](https://github.com/w0rkingchr1s/prntbtlr/actions/workflows/ci.yml/badge.svg)](https://github.com/w0rkingchr1s/prntbtlr/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
+[![GHCR](https://img.shields.io/badge/ghcr.io-prntbtlr-2496ED?logo=docker&logoColor=white)](https://github.com/w0rkingchr1s/prntbtlr/pkgs/container/prntbtlr)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 **Your Raspberry Pi print & scan butler.** Plug an old USB printer/scanner into a
@@ -114,6 +115,14 @@ status polling — **no build step, no CDN, works fully offline** on the Pi's LA
 ## Running it another way
 
 ### Docker
+
+Use the pre-built multi-arch image (amd64 + arm64) from GHCR:
+
+```bash
+docker pull ghcr.io/w0rkingchr1s/prntbtlr:latest
+```
+
+…or build locally with Compose:
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d --build

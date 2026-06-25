@@ -11,6 +11,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   before they reach `lpadmin`, so a crafted name can't be mistaken for a flag.
 
 ### Added
+- **Release automation**: a tag-driven `release.yml` workflow that builds a
+  multi-arch (amd64 + arm64) container image and pushes it to
+  `ghcr.io/w0rkingchr1s/prntbtlr` (`:<version>` + `:latest`), then creates a
+  GitHub Release with notes extracted from this changelog. Docs in CONTRIBUTING.
 - **OCR / searchable PDFs**: a "Searchable PDF (OCR)" option in the scan form
   (via ocrmypdf + tesseract), best-effort so a plain scan is still saved if OCR
   fails or isn't installed. Installer flag `ENABLE_OCR=1` (with optional

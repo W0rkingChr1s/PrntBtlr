@@ -61,6 +61,23 @@ shellcheck scripts/*.sh     # shell scripts
 - Fill in the PR template and link the issue (`Closes #123`).
 - Green CI is required before merge.
 
+## Releasing
+
+Releases are tag-driven. To cut one:
+
+1. Move the relevant `## [Unreleased]` notes in [`CHANGELOG.md`](CHANGELOG.md)
+   under a new `## [x.y.z] - YYYY-MM-DD` heading, and bump `version` in
+   `pyproject.toml` / `app/__init__.py`.
+2. Tag and push:
+
+   ```bash
+   git tag v0.2.0 && git push origin v0.2.0
+   ```
+
+The **Release** workflow then builds a multi-arch image
+(`ghcr.io/w0rkingchr1s/prntbtlr:0.2.0` + `:latest`) and creates a GitHub Release
+with notes pulled from the matching CHANGELOG section.
+
 ## Reporting bugs / requesting features
 
 Use the [issue templates](https://github.com/w0rkingchr1s/prntbtlr/issues/new/choose).
