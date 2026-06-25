@@ -22,7 +22,7 @@ if [ "${PURGE_CONFIG:-0}" = "1" ]; then
   echo "==> Removing PrntBtlr system config (udev rule, scan script, env)…"
   rm -f /etc/udev/rules.d/50-prntbtlr-noautosuspend.rules
   rm -f /etc/udev/rules.d/50-canon-noautosuspend.rules  # legacy name
-  rm -f /etc/scanbd/scripts/scan2pdf.sh
+  rm -f /etc/scanbd/scripts/scan2pdf.sh /etc/scanbd/scripts/scan2pdf-ocr.sh
   rm -rf /etc/prntbtlr
   udevadm control --reload-rules 2>/dev/null || true
   echo "    Note: the Samba [scans] block and scanbd action were left in place."

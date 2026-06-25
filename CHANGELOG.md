@@ -11,6 +11,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   before they reach `lpadmin`, so a crafted name can't be mistaken for a flag.
 
 ### Added
+- **OCR / searchable PDFs**: a "Searchable PDF (OCR)" option in the scan form
+  (via ocrmypdf + tesseract), best-effort so a plain scan is still saved if OCR
+  fails or isn't installed. Installer flag `ENABLE_OCR=1` (with optional
+  `OCR_LANGS="eng deu"`) installs it. `PRNTBTLR_OCR_LANG` selects the language.
+- **Second scan button**: `scan2pdf-ocr.sh` wrapper + a documented second
+  scanbd action so the MX870's two task buttons can produce plain vs. searchable
+  PDFs. `scan2pdf.sh` gained `PRNTBTLR_OCR` / `PRNTBTLR_OCR_LANG` support.
+
+### Added
 - **Opt-in panel authentication**: a session-cookie login (styled login page +
   sign-out) guarding every page except `/login`, `/healthz` and static assets.
   Off by default. Passwords are PBKDF2-hashed; `python -m app.auth hash|secret`

@@ -57,6 +57,11 @@ def available() -> bool:
     return shell.which(settings.scanimage) is not None
 
 
+def ocr_available() -> bool:
+    """True when ocrmypdf is installed (enables searchable-PDF output)."""
+    return shell.which("ocrmypdf") is not None
+
+
 def list_devices() -> list[ScanDevice]:
     """Run ``scanimage -L``. Can take a few seconds while the USB bus settles."""
     res = shell.run([settings.scanimage, "-L"], timeout=settings.command_timeout)
@@ -84,12 +89,14 @@ def scan_now(
     source: str = "Flatbed",
     mode: str = "Color",
     resolution: int = 300,
+    ocr: bool = False,
 ) -> tuple[bool, str, Path | None]:
     """Perform a single scan and convert it to a PDF in :data:`settings.scan_dir`.
 
-    Returns ``(ok, message, path)``. The heavy lifting (multi-page ADF batches)
-    lives in ``scan2pdf.sh``; from the browser we keep it to a single page so the
-    request stays predictable.
+    When *ocr* is true and ocrmypdf is installed, the PDF is post-processed into a
+    searchable PDF (text layer via tesseract). Returns ``(ok, message, path)``.
+    The heavy lifting (multi-page ADF batches) lives in ``scan2pdf.sh``; from the
+    browser we keep it to a single page so the request stays predictable.
     """
     if not available():
         return False, "scanimage is not installed.", None
@@ -129,7 +136,38 @@ def scan_now(
     tiff.unlink(missing_ok=True)
     if not conv.ok:
         return False, f"PDF conversion failed: {conv.output}", None
+
+    if ocr:
+        ok, note = _ocr_in_place(pdf)
+        if ok:
+            return True, f"Saved {pdf.name} (searchable)", pdf
+        # OCR is best-effort: keep the plain scan, but tell the user it didn't run.
+        return True, f"Saved {pdf.name} — OCR skipped: {note}", pdf
+
     return True, f"Saved {pdf.name}", pdf
+
+
+def _ocr_in_place(pdf: Path) -> tuple[bool, str]:
+    """Add a searchable text layer to *pdf* using ocrmypdf. Best-effort."""
+    if not ocr_available():
+        return False, "ocrmypdf not installed"
+    out = pdf.with_suffix(".ocr.pdf")
+    res = shell.run(
+        [
+            "ocrmypdf",
+            "-l",
+            settings.ocr_lang,
+            "--skip-text",  # don't fail if a page already has text
+            str(pdf),
+            str(out),
+        ],
+        timeout=settings.scan_timeout,
+    )
+    if res.ok and out.exists():
+        out.replace(pdf)
+        return True, ""
+    out.unlink(missing_ok=True)
+    return False, res.output or "ocrmypdf failed"
 
 
 def _scan_to_file(cmd: list[str], dest: Path) -> shell.Result:

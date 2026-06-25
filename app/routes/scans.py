@@ -18,6 +18,7 @@ def scans_page(request: Request):
         "scans.html",
         nav_active="scans",
         available=scan.available(),
+        ocr_available=scan.ocr_available(),
         devices=scan.list_devices() if scan.available() else [],
         scans=scan.list_scans(),
     )
@@ -29,12 +30,14 @@ def new_scan(
     source: str = Form("Flatbed"),
     mode: str = Form("Color"),
     resolution: int = Form(300),
+    ocr: bool = Form(False),
 ):
     ok, message, _ = scan.scan_now(
         device=device or None,
         source=source,
         mode=mode,
         resolution=resolution,
+        ocr=ocr,
     )
     return redirect("/scans", message, "success" if ok else "error")
 
