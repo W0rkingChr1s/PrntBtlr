@@ -1,0 +1,19 @@
+[Unit]
+Description=PrntBtlr scan-button listener (Canon PIXMA USB interrupt)
+Documentation=https://github.com/w0rkingchr1s/prntbtlr
+After=multi-user.target
+# The listener reads the scanner's USB interrupt endpoint directly; scanbd
+# polling the same device would fight it for access. Only one may run at a time.
+Conflicts=scanbd.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/prntbtlr/prntbtlr.env
+# Uses the system python3 (with python3-usb / pyusb), not the app venv, and
+# needs raw USB access — hence root, like the rest of PrntBtlr.
+ExecStart=/usr/bin/python3 /opt/prntbtlr/scan-listen.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

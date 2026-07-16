@@ -4,11 +4,11 @@
 Some Canon PIXMA MFPs — the MX870 among them — do not report their scan button
 through SANE's pollable ``button-1``/``button-2`` options, so ``scanbd`` never
 fires. They *do* emit the press on the USB interrupt endpoint, though. This
-daemon reads that endpoint directly and, on a press, runs the same scan script
-scanbd would, dropping a PDF into the shared scan folder:
+daemon reads that endpoint directly and, on a press, runs scan2pdf.sh, dropping
+a PDF into the shared scan folder:
 
-    Color button  (buf[7] & 1)  -> scan2pdf.sh       (plain PDF)
-    Black button  (buf[7] & 2)  -> scan2pdf-ocr.sh   (searchable PDF, if OCR set up)
+    Color button  (buf[7] & 1)  -> colour scan
+    Black button  (buf[7] & 2)  -> grayscale scan (PRNTBTLR_BLACK_MODE, see below)
 
 The interrupt payload was decoded against the SANE pixma backend
 (``pixma_mp150.c``): button number in ``buf[7]``, document type in ``buf[6]``,
@@ -18,6 +18,8 @@ Config via environment:
     PRNTBTLR_SCAN_USB_VID    USB vendor id  (default 0x04a9 = Canon)
     PRNTBTLR_SCAN_USB_PID    USB product id (default: first matching device)
     PRNTBTLR_SCANBD_SCRIPTS  dir holding scan2pdf.sh (default /etc/scanbd/scripts)
+    PRNTBTLR_BLACK_MODE      scan mode for the Black button (default Gray; Lineart
+                             for pure 1-bit black & white)
 """
 
 from __future__ import annotations
@@ -39,8 +41,10 @@ _pid = os.environ.get("PRNTBTLR_SCAN_USB_PID")
 PID = int(_pid, 0) if _pid else None
 
 SCRIPT_DIR = os.environ.get("PRNTBTLR_SCANBD_SCRIPTS", "/etc/scanbd/scripts")
-SCAN_COLOR = os.path.join(SCRIPT_DIR, "scan2pdf.sh")
-SCAN_BLACK = os.path.join(SCRIPT_DIR, "scan2pdf-ocr.sh")
+SCAN_SCRIPT = os.path.join(SCRIPT_DIR, "scan2pdf.sh")
+# The Black button scans in this mode (matches the button on the device); the
+# Color button scans in Color. Set to "Lineart" for pure 1-bit black & white.
+BLACK_MODE = os.environ.get("PRNTBTLR_BLACK_MODE", "Gray")
 
 # The scanner is briefly busy right after the press (it kicks off its own "scan
 # to PC" attempt), so wait before pulling; scan2pdf.sh also retries internally.
@@ -75,18 +79,21 @@ def find_interrupt_in(dev):
 
 
 def run_scan(which: int) -> None:
-    script = SCAN_COLOR if which == 1 else SCAN_BLACK
-    if not os.path.exists(script):
-        log(f"scan script not found: {script} (run the installer, or set PRNTBTLR_SCANBD_SCRIPTS)")
+    if not os.path.exists(SCAN_SCRIPT):
+        log(
+            f"scan script not found: {SCAN_SCRIPT} (run the installer, or set PRNTBTLR_SCANBD_SCRIPTS)"
+        )
         return
     env = dict(os.environ)
     if which == 2:
-        # Black button → searchable PDF (best-effort; falls back to a plain scan).
-        env.setdefault("PRNTBTLR_OCR", "1")
-    label = "color → scan2pdf.sh" if which == 1 else "black → scan2pdf-ocr.sh"
+        # Black button → grayscale (or Lineart), matching the device's button.
+        env["PRNTBTLR_SCAN_MODE"] = BLACK_MODE
+        label = f"black → {BLACK_MODE}"
+    else:
+        label = "color → Color"
     log(f"button {which} pressed ({label})")
     try:
-        subprocess.run(["/bin/bash", script], env=env, timeout=SCAN_TIMEOUT, check=False)
+        subprocess.run(["/bin/bash", SCAN_SCRIPT], env=env, timeout=SCAN_TIMEOUT, check=False)
     except subprocess.TimeoutExpired:
         log("scan script timed out")
     log("scan finished")
@@ -126,9 +133,11 @@ def listen_once() -> bool:
         except usb.core.USBError as err:
             if err.errno in (110, 60):  # timeout — normal, keep waiting
                 continue
-            # Device busy (e.g. a panel scan) or unplugged — re-discover.
+            # Device busy (e.g. a panel scan) or unplugged — re-discover, but
+            # pause first so we don't busy-loop while something else holds it.
             log(f"usb read error ({err.errno}); re-acquiring device")
             usb.util.dispose_resources(dev)
+            time.sleep(1)
             return True
 
         if len(data) <= 7:

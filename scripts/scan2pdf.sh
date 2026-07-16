@@ -17,6 +17,7 @@ set -u
 OUTDIR="${PRNTBTLR_SCAN_DIR:-/srv/scans}"
 TS=$(date +%Y%m%d_%H%M%S)
 DEV="${SCANBD_DEVICE:-pixma}"
+MODE="${PRNTBTLR_SCAN_MODE:-Color}"   # Color | Gray | Lineart
 OCR="${PRNTBTLR_OCR:-0}"
 OCR_LANG="${PRNTBTLR_OCR_LANG:-eng}"
 TMP=$(mktemp -d) || exit 1
@@ -56,10 +57,10 @@ while [ "$attempt" -lt 4 ]; do
 
   # Prefer the document feeder (multi-page); fall back to the glass (single page).
   if ! { scanimage -d "$DEV" --source "Automatic Document Feeder" \
-           --resolution 300 --mode Color --format=tiff \
+           --resolution 300 --mode "$MODE" --format=tiff \
            --batch=p_%03d.tiff 2>/dev/null && ls p_*.tiff >/dev/null 2>&1; }; then
     rm -f p_*.tiff
-    scanimage -d "$DEV" --resolution 300 --mode Color --format=tiff \
+    scanimage -d "$DEV" --resolution 300 --mode "$MODE" --format=tiff \
       > p_001.tiff 2>/dev/null
   fi
 
