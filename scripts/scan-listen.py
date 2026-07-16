@@ -142,8 +142,14 @@ def listen_once() -> bool:
             continue
 
         which = 1 if (data[7] & 1) else 2
-        # Release the device so scanimage (called by the scan script) can open it,
-        # then let the device settle out of its own push attempt before pulling.
+        # A plain release leaves the scanner mid-transaction from our interrupt
+        # reads, and the device is still busy with its own "scan to PC" push — a
+        # scan pulled right now comes back truncated. A USB reset puts it back
+        # into a clean, idle state so scanimage gets a full page.
+        try:
+            dev.reset()
+        except usb.core.USBError as err:
+            log(f"usb reset failed ({err}); continuing")
         usb.util.dispose_resources(dev)
         time.sleep(SETTLE_SECONDS)
         run_scan(which)
