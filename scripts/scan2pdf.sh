@@ -26,6 +26,10 @@ trap cleanup EXIT
 
 mkdir -p "$OUTDIR"
 
+# Log that the button actually fired — makes "I pressed scan and nothing
+# happened" diagnosable (check: journalctl -t prntbtlr).
+logger -t prntbtlr "button scan fired (device=$DEV target=${SCANBD_TARGET:-?})"
+
 # Prefer the document feeder (multi-page); fall back to the glass (single page).
 if scanimage -d "$DEV" --source "Automatic Document Feeder" \
      --resolution 300 --mode Color --format=tiff \

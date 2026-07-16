@@ -68,6 +68,10 @@
     <p class="muted">Press the scan button on the printer and <strong>scanbd</strong>
       runs <span class="mono">scan2pdf.sh</span>: it scans (ADF if loaded, otherwise
       the glass), builds a PDF, and drops it into the shared folder below.</p>
+    <p class="muted">On a Canon PIXMA, the device's <strong>SCAN → PC</strong> option
+      triggers the same flow. If the printer shows &ldquo;Processing&hellip;&rdquo; but
+      no PDF appears, scanbd isn&rsquo;t firing &mdash; see the scan-button
+      troubleshooting in the README.</p>
     <table class="gap">
       <tbody>
         <tr><td class="muted">Save folder</td><td class="mono">/srv/scans</td></tr>

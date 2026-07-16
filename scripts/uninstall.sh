@@ -23,10 +23,12 @@ if [ "${PURGE_CONFIG:-0}" = "1" ]; then
   rm -f /etc/udev/rules.d/50-prntbtlr-noautosuspend.rules
   rm -f /etc/udev/rules.d/50-canon-noautosuspend.rules  # legacy name
   rm -f /etc/scanbd/scripts/scan2pdf.sh /etc/scanbd/scripts/scan2pdf-ocr.sh
+  rm -f /etc/scanbd/scanner.d/prntbtlr-pixma.conf
   rm -rf /etc/prntbtlr
   udevadm control --reload-rules 2>/dev/null || true
-  echo "    Note: the Samba [scans] block and scanbd action were left in place."
-  echo "    Remove them by hand from /etc/samba/smb.conf and /etc/scanbd/scanbd.conf."
+  echo "    Note: the Samba [scans] block and the scanbd.conf include line were"
+  echo "    left in place. Remove them by hand from /etc/samba/smb.conf and"
+  echo "    /etc/scanbd/scanbd.conf if you want a full cleanup."
 fi
 
 echo "Done. Your scans in /srv/scans were left untouched."
