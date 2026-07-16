@@ -1,9 +1,10 @@
 #!/bin/bash
 # PrntBtlr — button-triggered scan handler.
 #
-# Invoked by scanbd when the hardware scan button is pressed. Tries the ADF
-# first (multi-page), falls back to the flatbed (single page), assembles a PDF
-# and drops it into the shared scan folder.
+# Invoked by scanbd (or the PrntBtlr USB-interrupt listener, scan-listen.py) when
+# the hardware scan button is pressed. Tries the ADF first (multi-page), falls
+# back to the flatbed (single page), assembles a PDF and drops it into the shared
+# scan folder.
 #
 # Set PRNTBTLR_OCR=1 to produce a searchable PDF via ocrmypdf (used by the
 # scan2pdf-ocr.sh wrapper for a second scan button). PRNTBTLR_OCR_LANG selects
@@ -31,13 +32,28 @@ mkdir -p "$OUTDIR"
 logger -t prntbtlr "button scan fired (device=$DEV target=${SCANBD_TARGET:-?})"
 
 # Prefer the document feeder (multi-page); fall back to the glass (single page).
-if scanimage -d "$DEV" --source "Automatic Document Feeder" \
-     --resolution 300 --mode Color --format=tiff \
-     --batch=p_%03d.tiff 2>/dev/null; then
-  :
-else
-  scanimage -d "$DEV" --resolution 300 --mode Color --format=tiff > p_001.tiff
-fi
+# Right after a hardware button press the scanner can be briefly busy (it starts
+# its own "scan to PC" attempt), so retry a few times before giving up — and only
+# keep a page that actually has bytes, so a failed open can't leave an empty TIFF
+# that would turn into a broken PDF.
+attempt=0
+while [ "$attempt" -lt 4 ]; do
+  attempt=$((attempt + 1))
+  rm -f p_*.tiff
+  if scanimage -d "$DEV" --source "Automatic Document Feeder" \
+       --resolution 300 --mode Color --format=tiff \
+       --batch=p_%03d.tiff 2>/dev/null && ls p_*.tiff >/dev/null 2>&1; then
+    break
+  fi
+  rm -f p_*.tiff
+  if scanimage -d "$DEV" --resolution 300 --mode Color --format=tiff \
+       > p_001.tiff 2>/dev/null && [ -s p_001.tiff ]; then
+    break
+  fi
+  rm -f p_*.tiff
+  logger -t prntbtlr "scan attempt $attempt found no page (device busy?), retrying"
+  sleep 2
+done
 
 if ls p_*.tiff >/dev/null 2>&1; then
   OUT="$OUTDIR/scan_$TS.pdf"

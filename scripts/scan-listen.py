@@ -42,6 +42,9 @@ SCRIPT_DIR = os.environ.get("PRNTBTLR_SCANBD_SCRIPTS", "/etc/scanbd/scripts")
 SCAN_COLOR = os.path.join(SCRIPT_DIR, "scan2pdf.sh")
 SCAN_BLACK = os.path.join(SCRIPT_DIR, "scan2pdf-ocr.sh")
 
+# The scanner is briefly busy right after the press (it kicks off its own "scan
+# to PC" attempt), so wait before pulling; scan2pdf.sh also retries internally.
+SETTLE_SECONDS = 2.0
 # The device sends several interrupt packets per press; after a scan we pause to
 # swallow repeats and let the device settle before listening again.
 DRAIN_SECONDS = 3.0
@@ -139,8 +142,10 @@ def listen_once() -> bool:
             continue
 
         which = 1 if (data[7] & 1) else 2
-        # Release the device so scanimage (called by the scan script) can open it.
+        # Release the device so scanimage (called by the scan script) can open it,
+        # then let the device settle out of its own push attempt before pulling.
         usb.util.dispose_resources(dev)
+        time.sleep(SETTLE_SECONDS)
         run_scan(which)
         time.sleep(DRAIN_SECONDS)
         return True
