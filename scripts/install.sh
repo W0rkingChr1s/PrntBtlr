@@ -131,7 +131,7 @@ if [ "${SKIP_APT:-0}" != "1" ]; then
     avahi-daemon avahi-utils \
     sane-utils scanbd img2pdf \
     samba samba-common-bin \
-    python3 python3-venv python3-pip \
+    python3 python3-venv python3-pip python3-usb \
     usbutils curl ca-certificates iproute2
   ok "Packages installed"
 
@@ -248,15 +248,46 @@ if command -v scanbd >/dev/null 2>&1; then
     warn "scanbd.conf not found — add include(scanner.d/prntbtlr-pixma.conf) by hand."
   fi
 
-  # Enable + (re)start so the button actions take effect immediately.
   systemctl enable scanbd >/dev/null 2>&1 || true
-  if systemctl restart scanbd >/dev/null 2>&1; then
-    ok "scanbd restarted — PIXMA button scanning is live"
+
+  # --- Canon PIXMA button listener (works where scanbd's poll doesn't) ------- #
+  # Some PIXMA MFPs — the MX870 among them — don't report their scan button
+  # through SANE's pollable button-1/button-2 options, so scanbd never fires.
+  # scan-listen.py reads the press straight off the USB interrupt endpoint and
+  # runs the same scan script. It needs exclusive USB access, so when a Canon
+  # device is present we run the listener *instead of* scanbd.
+  mkdir -p "$APP_DIR"   # app is deployed later; the listener script lands early
+  install -m 0755 "$REPO_DIR/scripts/scan-listen.py" "$APP_DIR/scan-listen.py"
+  install -m 0644 "$REPO_DIR/deploy/prntbtlr-scan-listen.service" \
+    /etc/systemd/system/prntbtlr-scan-listen.service
+  systemctl daemon-reload
+
+  CANON_PRESENT=0
+  for vf in /sys/bus/usb/devices/*/idVendor; do
+    if [ -r "$vf" ] && [ "$(cat "$vf")" = "04a9" ]; then
+      CANON_PRESENT=1
+      break
+    fi
+  done
+
+  if [ "$CANON_PRESENT" = "1" ]; then
+    # Listener and scanbd can't share the USB scanner — hand the button to the
+    # listener, which works on PIXMAs that scanbd's poll can't read.
+    systemctl disable --now scanbd >/dev/null 2>&1 || true
+    if systemctl enable --now prntbtlr-scan-listen >/dev/null 2>&1; then
+      ok "Canon PIXMA detected — USB-interrupt button listener active (scanbd disabled)"
+    else
+      warn "Could not start prntbtlr-scan-listen — check: systemctl status prntbtlr-scan-listen"
+    fi
   else
-    warn "Could not restart scanbd — run: sudo systemctl restart scanbd"
+    if systemctl restart scanbd >/dev/null 2>&1; then
+      ok "No Canon device detected — using scanbd for the button (listener installed, idle)"
+    else
+      warn "Could not restart scanbd — run: sudo systemctl restart scanbd"
+    fi
+    warn "Non-PIXMA scanner? Wire the button name per config/scanbd-action.conf,"
+    warn "  then: sudo systemctl restart scanbd"
   fi
-  warn "Not a PIXMA? Wire the button name by hand per config/scanbd-action.conf,"
-  warn "  then: sudo systemctl restart scanbd"
 else
   warn "scanbd not installed — skipping button-scan setup"
 fi

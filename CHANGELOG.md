@@ -6,16 +6,31 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Reliable button scanning for Canon PIXMA via the USB interrupt endpoint.**
+  Several PIXMA MFPs (e.g. the MX870) don't report their scan button through
+  SANE's pollable `button-1`/`button-2` options, so `scanbd` never fires. A new
+  daemon (`scripts/scan-listen.py`, service `prntbtlr-scan-listen`) reads the
+  press straight off the scanner's USB interrupt endpoint (decoded against the
+  pixma backend) and runs the scan: **Color** button → colour PDF, **Black**
+  button → grayscale PDF (`PRNTBTLR_BLACK_MODE=Lineart` for 1-bit B&W). The
+  installer pulls in `python3-usb`, and when a Canon device is present it enables
+  the listener and disables `scanbd` (they can't share the USB scanner).
+- `scan2pdf.sh` scan mode is now configurable via `PRNTBTLR_SCAN_MODE`
+  (`Color`/`Gray`/`Lineart`).
+
 ### Fixed
-- **Scan button did nothing on Canon PIXMA (e.g. the MX870).** The installer set
-  up scanbd but left the button action as a manual, "discover the button name"
-  step, so pressing **SCAN → PC** on the device left it waiting ("Processing… /
-  Verarbeitung…") while the Pi never picked up the scan. The pixma backend uses
-  well-known button names, so PrntBtlr now ships a ready-to-use action config
-  (`config/scanbd-pixma.conf`, wiring `button-1`/`button-2`); the installer drops
-  it into `/etc/scanbd/scanner.d/`, ensures `scanbd.conf` includes it, and
-  restarts scanbd — so PIXMA button scanning works out of the box. `scan2pdf.sh`
-  now logs each firing (`journalctl -t prntbtlr`) to make this diagnosable.
+- **Scan button did nothing on Canon PIXMA (e.g. the MX870).** Pressing
+  **SCAN → PC** left the device waiting ("Processing… / Verarbeitung…") while the
+  Pi never picked up the scan. It turned out several PIXMAs don't expose the
+  button through SANE's pollable options at all, so `scanbd` couldn't see it —
+  the new USB-interrupt listener (see Added) handles it instead. The installer
+  still ships a ready-to-use scanbd action config (`config/scanbd-pixma.conf`,
+  wiring `button-1`/`button-2`, included from `scanbd.conf`) for PIXMAs whose
+  buttons *are* pollable and as the path for non-Canon scanners.
+- `scan2pdf.sh` now retries a briefly-busy scanner and only writes a PDF once a
+  page actually converts, so a failed/partial scan can't leave a 0-byte PDF, and
+  logs each firing (`journalctl -t prntbtlr`) to make button scans diagnosable.
 
 ### Security
 - Validate printer queue names (`[A-Za-z0-9_][A-Za-z0-9_.-]*`, no leading hyphen)

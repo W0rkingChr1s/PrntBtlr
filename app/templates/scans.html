@@ -65,13 +65,13 @@
 
   <div class="card">
     <h2>How the scan button works</h2>
-    <p class="muted">Press the scan button on the printer and <strong>scanbd</strong>
-      runs <span class="mono">scan2pdf.sh</span>: it scans (ADF if loaded, otherwise
+    <p class="muted">Press the scan button on the printer and PrntBtlr runs
+      <span class="mono">scan2pdf.sh</span>: it scans (ADF if loaded, otherwise
       the glass), builds a PDF, and drops it into the shared folder below.</p>
-    <p class="muted">On a Canon PIXMA, the device's <strong>SCAN → PC</strong> option
-      triggers the same flow. If the printer shows &ldquo;Processing&hellip;&rdquo; but
-      no PDF appears, scanbd isn&rsquo;t firing &mdash; see the scan-button
-      troubleshooting in the README.</p>
+    <p class="muted">On a Canon PIXMA, press <strong>SCAN → PC</strong> and then
+      <strong>Color</strong> for a colour PDF or <strong>Black</strong> for a
+      grayscale one. If the printer shows &ldquo;Processing&hellip;&rdquo; but no
+      PDF appears, see the scan-button troubleshooting in the README.</p>
     <table class="gap">
       <tbody>
         <tr><td class="muted">Save folder</td><td class="mono">/srv/scans</td></tr>

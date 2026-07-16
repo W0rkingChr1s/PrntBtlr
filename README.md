@@ -77,13 +77,21 @@ output is logged to `/var/log/prntbtlr-install.log`.
 
 ### The scan button
 
-**Canon PIXMA** scanners (like the MX870) work out of the box: the installer
-wires scanbd's well-known `button-1` / `button-2` actions from
-[`config/scanbd-pixma.conf`](config/scanbd-pixma.conf). Press **SCAN** on the
-device, pick **PC / save** as the target, and the PDF lands in `/srv/scans`.
+**Canon PIXMA** scanners (like the MX870) work out of the box — no manual
+setup. Several PIXMA MFPs don't report their scan button through SANE's
+pollable options (so `scanbd` never fires), so PrntBtlr instead reads the press
+straight off the scanner's **USB interrupt endpoint** with a tiny daemon
+([`scripts/scan-listen.py`](scripts/scan-listen.py), run as
+`prntbtlr-scan-listen`). When the installer sees a Canon device it enables the
+listener and steps `scanbd` aside (they can't share the USB scanner).
 
-For **other scanners** the button's internal name is hardware-specific and can't
-be guessed. Discover it once and wire it up — see
+On the device, press **SCAN → PC**, then the start button:
+
+- **Color** → a colour PDF in `/srv/scans`
+- **Black** → a grayscale PDF (set `PRNTBTLR_BLACK_MODE=Lineart` for pure 1-bit B&W)
+
+For **non-Canon scanners** the button is handled by `scanbd`, whose button name
+is hardware-specific. Discover it once and wire it up — see
 [`config/scanbd-action.conf`](config/scanbd-action.conf):
 
 ```bash
@@ -95,24 +103,19 @@ sudo systemctl enable --now scanbd
 
 Scanning from the **web panel** works without any of this.
 
-**Pressed the button and nothing happened?** If the scanner shows
-"Processing… / Verarbeitung…" and then times out, the Pi never picked up the
-job — scanbd isn't firing the action. Check the daemon is running
-(`systemctl status scanbd`), confirm SANE sees the scanner (`sudo scanimage -L`),
-then watch a live press to see the button fire:
+**Pressed the button and nothing happened?** Check the handler is running and
+watch the log — each scan logs there:
 
 ```bash
-sudo systemctl stop scanbd
-sudo scanbd -f          # press SCAN → PC on the device; you should see button-1 change
-# Ctrl+C, then: sudo systemctl start scanbd
-journalctl -t prntbtlr -n 20   # each button scan logs "button scan fired …"
+systemctl status prntbtlr-scan-listen    # Canon PIXMA (or: scanbd, others)
+journalctl -t prntbtlr -n 20             # "button scan fired …" / "scan saved …"
+sudo scanimage -L                        # confirm SANE sees the scanner
 ```
 
 **Searchable PDFs (OCR).** Install OCR with `sudo ENABLE_OCR=1 ./scripts/install.sh`
-(add languages with `OCR_LANGS="eng deu"`). Then tick **Searchable PDF (OCR)** in
-the panel's scan form, or wire the MX870's **second** scan button to
-`scan2pdf-ocr.sh` (see [`config/scanbd-action.conf`](config/scanbd-action.conf))
-so one button gives a plain PDF and the other an OCR'd, searchable one.
+(add languages with `OCR_LANGS="eng deu"`), then tick **Searchable PDF (OCR)** in
+the panel's scan form. To OCR button scans too, add `PRNTBTLR_OCR=1` to
+`/etc/prntbtlr/prntbtlr.env` and restart the handler.
 
 ---
 
