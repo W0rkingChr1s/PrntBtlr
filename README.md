@@ -75,10 +75,16 @@ Every config file it touches is backed up as `<file>.bak.<timestamp>` first, the
 script is **idempotent** (re-running is also the upgrade path), and the full
 output is logged to `/var/log/prntbtlr-install.log`.
 
-### One manual step: the scan button
+### The scan button
 
-The scan button's internal name is hardware-specific and can't be guessed.
-Discover it once and wire it up — see [`config/scanbd-action.conf`](config/scanbd-action.conf):
+**Canon PIXMA** scanners (like the MX870) work out of the box: the installer
+wires scanbd's well-known `button-1` / `button-2` actions from
+[`config/scanbd-pixma.conf`](config/scanbd-pixma.conf). Press **SCAN** on the
+device, pick **PC / save** as the target, and the PDF lands in `/srv/scans`.
+
+For **other scanners** the button's internal name is hardware-specific and can't
+be guessed. Discover it once and wire it up — see
+[`config/scanbd-action.conf`](config/scanbd-action.conf):
 
 ```bash
 sudo systemctl stop scanbd
@@ -87,8 +93,20 @@ sudo scanbd -f          # press the scan button; note the option name + 0→1 ch
 sudo systemctl enable --now scanbd
 ```
 
-Scanning from the **web panel** works without this — the button just adds the
-"press the hardware button" convenience.
+Scanning from the **web panel** works without any of this.
+
+**Pressed the button and nothing happened?** If the scanner shows
+"Processing… / Verarbeitung…" and then times out, the Pi never picked up the
+job — scanbd isn't firing the action. Check the daemon is running
+(`systemctl status scanbd`), confirm SANE sees the scanner (`sudo scanimage -L`),
+then watch a live press to see the button fire:
+
+```bash
+sudo systemctl stop scanbd
+sudo scanbd -f          # press SCAN → PC on the device; you should see button-1 change
+# Ctrl+C, then: sudo systemctl start scanbd
+journalctl -t prntbtlr -n 20   # each button scan logs "button scan fired …"
+```
 
 **Searchable PDFs (OCR).** Install OCR with `sudo ENABLE_OCR=1 ./scripts/install.sh`
 (add languages with `OCR_LANGS="eng deu"`). Then tick **Searchable PDF (OCR)** in

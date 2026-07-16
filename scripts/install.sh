@@ -220,10 +220,43 @@ if command -v scanbd >/dev/null 2>&1; then
   install -m 0755 "$REPO_DIR/scripts/scan2pdf.sh" /etc/scanbd/scripts/scan2pdf.sh
   install -m 0755 "$REPO_DIR/scripts/scan2pdf-ocr.sh" /etc/scanbd/scripts/scan2pdf-ocr.sh
   ok "Installed scan2pdf.sh + scan2pdf-ocr.sh (second button → searchable PDF)"
-  # Enable the service now; the action block (button name) is wired up by hand later.
+
+  # Wire the button actions. The pixma backend uses well-known button names
+  # (button-1/button-2), so PIXMA scanners work out of the box — no per-device
+  # "discover the button name" step. (Other scanners: config/scanbd-action.conf.)
+  install -d /etc/scanbd/scanner.d
+  install -m 0644 "$REPO_DIR/config/scanbd-pixma.conf" \
+    /etc/scanbd/scanner.d/prntbtlr-pixma.conf
+  ok "Installed PIXMA button actions → /etc/scanbd/scanner.d/prntbtlr-pixma.conf"
+
+  # Make sure scanbd.conf actually pulls the scanner.d config in. If a glob
+  # include is already active it covers our file; otherwise add a specific
+  # include (avoids double-including anything).
+  SCANBD_CONF=/etc/scanbd/scanbd.conf
+  if [ -f "$SCANBD_CONF" ]; then
+    if grep -Eq '^[[:space:]]*include\(scanner\.d/\*\.conf\)' "$SCANBD_CONF"; then
+      ok "scanbd.conf already includes scanner.d/*.conf"
+    elif grep -q 'scanner.d/prntbtlr-pixma.conf' "$SCANBD_CONF"; then
+      ok "scanbd.conf already pulls in the PrntBtlr PIXMA config"
+    else
+      backup "$SCANBD_CONF"
+      printf '\n# PrntBtlr: Canon PIXMA button actions\ninclude(scanner.d/prntbtlr-pixma.conf)\n' \
+        >> "$SCANBD_CONF"
+      ok "Added include(scanner.d/prntbtlr-pixma.conf) to scanbd.conf"
+    fi
+  else
+    warn "scanbd.conf not found — add include(scanner.d/prntbtlr-pixma.conf) by hand."
+  fi
+
+  # Enable + (re)start so the button actions take effect immediately.
   systemctl enable scanbd >/dev/null 2>&1 || true
-  warn "Button name is hardware-specific — finish setup per config/scanbd-action.conf,"
-  warn "  add the action block to /etc/scanbd/scanbd.conf, then: sudo systemctl restart scanbd"
+  if systemctl restart scanbd >/dev/null 2>&1; then
+    ok "scanbd restarted — PIXMA button scanning is live"
+  else
+    warn "Could not restart scanbd — run: sudo systemctl restart scanbd"
+  fi
+  warn "Not a PIXMA? Wire the button name by hand per config/scanbd-action.conf,"
+  warn "  then: sudo systemctl restart scanbd"
 else
   warn "scanbd not installed — skipping button-scan setup"
 fi

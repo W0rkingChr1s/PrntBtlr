@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **Scan button did nothing on Canon PIXMA (e.g. the MX870).** The installer set
+  up scanbd but left the button action as a manual, "discover the button name"
+  step, so pressing **SCAN → PC** on the device left it waiting ("Processing… /
+  Verarbeitung…") while the Pi never picked up the scan. The pixma backend uses
+  well-known button names, so PrntBtlr now ships a ready-to-use action config
+  (`config/scanbd-pixma.conf`, wiring `button-1`/`button-2`); the installer drops
+  it into `/etc/scanbd/scanner.d/`, ensures `scanbd.conf` includes it, and
+  restarts scanbd — so PIXMA button scanning works out of the box. `scan2pdf.sh`
+  now logs each firing (`journalctl -t prntbtlr`) to make this diagnosable.
+
 ### Security
 - Validate printer queue names (`[A-Za-z0-9_][A-Za-z0-9_.-]*`, no leading hyphen)
   before they reach `lpadmin`, so a crafted name can't be mistaken for a flag.
