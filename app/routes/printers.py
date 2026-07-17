@@ -12,11 +12,13 @@ router = APIRouter(prefix="/printers")
 
 @router.get("")
 def printers_page(request: Request):
+    status = cups.status()
     return render(
         request,
         "printers.html",
         nav_active="printers",
-        cups=cups.status(),
+        cups=status,
+        dup_serials=cups.duplicate_device_serials(status.printers),
     )
 
 

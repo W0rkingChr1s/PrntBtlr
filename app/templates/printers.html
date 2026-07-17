@@ -21,8 +21,15 @@
           {% elif p.state == 'idle' %}<span class="badge ok">idle</span>
           {% elif p.state == 'processing' %}<span class="badge idle">printing</span>
           {% else %}<span class="badge warn">{{ p.state }}</span>{% endif %}
+          {% if p.is_fax %}<span class="badge plain" title="Fax interface of the device — cannot print documents">fax</span>{% endif %}
+          {% if p.serial and p.serial in dup_serials %}<span class="badge warn" title="Another queue points at the same physical device">same device</span>{% endif %}
         </h2>
         <div class="muted mono">{{ p.uri or 'no device URI' }}</div>
+        {% if p.serial and p.serial in dup_serials %}
+          <div class="muted">Shares the physical device (serial {{ p.serial }}) with another queue.
+            {% if p.is_fax %}This is the <strong>fax</strong> interface and normally can't print documents — the other queue is the printer.
+            {% else %}Same printer surfaced as two queues (e.g. CUPS auto-created one on USB hotplug next to a manual one). Keep the one you use and delete the other if it's redundant.{% endif %}</div>
+        {% endif %}
         {% if p.state_detail %}<div class="muted">{{ p.state_detail }}</div>{% endif %}
       </div>
     </div>

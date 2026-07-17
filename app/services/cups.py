@@ -51,6 +51,42 @@ class Printer:
     def is_usb(self) -> bool:
         return self.uri.lower().startswith("usb://")
 
+    @property
+    def device_params(self) -> dict[str, str]:
+        """Query parameters of the device URI (``serial``, ``interface``, ...).
+
+        Keys are lower-cased; an empty dict when the URI carries no query. CUPS
+        writes these as ``usb://Canon/MX870%20series?serial=10C5A0&interface=1``.
+        """
+        if "?" not in self.uri:
+            return {}
+        params: dict[str, str] = {}
+        for part in self.uri.split("?", 1)[1].split("&"):
+            if "=" in part:
+                key, value = part.split("=", 1)
+                params[key.strip().lower()] = value.strip()
+        return params
+
+    @property
+    def serial(self) -> str:
+        """The device serial from the URI — the stable identity of the physical
+        printer, shared by every queue that points at the same hardware."""
+        return self.device_params.get("serial", "")
+
+    @property
+    def usb_interface(self) -> str:
+        """The USB interface number, if present. Multifunction devices expose
+        several (e.g. print vs. fax), each as its own queue."""
+        return self.device_params.get("interface", "")
+
+    @property
+    def is_fax(self) -> bool:
+        """True when this queue is the device's fax endpoint rather than its
+        printer — reported by the model name in the URI path (``...FAX``). Such
+        a queue shows up alongside the real one but can't print documents.
+        """
+        return "fax" in self.uri.split("?", 1)[0].lower()
+
 
 @dataclass
 class Job:
@@ -175,6 +211,23 @@ def list_printers() -> list[Printer]:
             )
         )
     return printers
+
+
+def duplicate_device_serials(printers: list[Printer]) -> set[str]:
+    """Serials shared by more than one queue.
+
+    A single physical printer can surface as several CUPS queues — most often a
+    multifunction device whose print and fax USB interfaces each get their own
+    auto-created queue, and manual queues that race with CUPS' USB hotplug
+    discovery. They differ by URI (path and ``interface=``) but carry the *same*
+    ``serial=``, which is the reliable "same hardware" key. Returned so the UI
+    can flag such queues instead of leaving the user guessing why there are two.
+    """
+    counts: dict[str, int] = {}
+    for p in printers:
+        if p.serial:
+            counts[p.serial] = counts.get(p.serial, 0) + 1
+    return {serial for serial, n in counts.items() if n > 1}
 
 
 def list_jobs() -> list[Job]:
