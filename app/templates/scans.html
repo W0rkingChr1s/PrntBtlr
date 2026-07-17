@@ -39,13 +39,24 @@
             </select>
           </div>
         </div>
-        <div class="field">
-          <label for="resolution">Resolution (DPI)</label>
-          <select id="resolution" name="resolution">
-            <option value="150">150 — draft</option>
-            <option value="300" selected>300 — standard</option>
-            <option value="600">600 — high</option>
-          </select>
+        <div class="field-row">
+          <div class="field">
+            <label for="resolution">Resolution (DPI)</label>
+            <select id="resolution" name="resolution">
+              <option value="150">150 — draft</option>
+              <option value="300" selected>300 — standard</option>
+              <option value="600">600 — high</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="paper">Paper size</label>
+            <select id="paper" name="paper">
+              {% for p in paper_choices %}
+              <option value="{{ p }}" {% if p == paper_default %}selected{% endif %}>
+                {{ "Max — full scanner bed" if p == "Max" else p }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
         <div class="field">
           {% if ocr_available %}

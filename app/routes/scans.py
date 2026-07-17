@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import FileResponse
 
+from ..config import settings
 from ..services import scan
 from ..templating import redirect, render
 
@@ -20,6 +21,8 @@ def scans_page(request: Request):
         available=scan.available(),
         ocr_available=scan.ocr_available(),
         devices=scan.list_devices() if scan.available() else [],
+        paper_choices=scan.PAPER_CHOICES,
+        paper_default=settings.scan_paper,
         scans=scan.list_scans(),
     )
 
@@ -30,6 +33,7 @@ def new_scan(
     source: str = Form("Flatbed"),
     mode: str = Form("Color"),
     resolution: int = Form(300),
+    paper: str = Form(""),
     ocr: bool = Form(False),
 ):
     ok, message, _ = scan.scan_now(
@@ -37,6 +41,7 @@ def new_scan(
         source=source,
         mode=mode,
         resolution=resolution,
+        paper=paper or None,
         ocr=ocr,
     )
     return redirect("/scans", message, "success" if ok else "error")
