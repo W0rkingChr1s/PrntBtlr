@@ -45,6 +45,14 @@
       </div>
       {% endif %}
 
+      {% if update_notice %}
+      <div class="flash flash-info" role="status">
+        Update {{ update_notice.tag }} is available —
+        <a href="/system#updates">install it from the System page</a>.
+        <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+      </div>
+      {% endif %}
+
       <header class="page-head">
         <h1>{% block heading %}{% endblock %}</h1>
         <div class="page-actions">{% block actions %}{% endblock %}</div>

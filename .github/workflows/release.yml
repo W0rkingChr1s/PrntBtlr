@@ -1,15 +1,25 @@
 name: Release
 
 # Publish a GitHub Release and a multi-arch container image to GHCR whenever a
-# version tag is pushed:
+# version tag is pushed. Releases are the ONLY distribution channel — the
+# panel's self-updater feeds from them. Two channels:
 #
-#   git tag v0.1.0 && git push origin v0.1.0
+#   Beta:    git tag v0.2.0-beta.1 && git push origin v0.2.0-beta.1
+#            → GitHub *pre-release* + image tags :0.2.0-beta.1 and :beta
+#   Stable:  git tag v0.2.0 && git push origin v0.2.0
+#            → GitHub release + image tags :0.2.0, :0.2, :stable and :latest
 #
-# The image lands at ghcr.io/w0rkingchr1s/prntbtlr:<version> (+ :latest).
+# After every beta this workflow dispatches promote.yml, which cuts the stable
+# release automatically once 4 positive betas have shipped since the last
+# stable one (a beta is "positive" unless its release is marked [failed]).
+# A stable release can also be cut earlier — run promote.yml manually with
+# force=true, or push a stable tag by hand.
 
 on:
   push:
     tags: ["v*"]
+  # promote.yml re-runs this workflow on the stable tag it creates (a tag
+  # pushed with GITHUB_TOKEN doesn't fire the push trigger above).
   workflow_dispatch:
 
 permissions:
@@ -25,6 +35,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Detect release channel
+        id: channel
+        run: |
+          if [[ "$GITHUB_REF_NAME" == *-beta.* ]]; then
+            echo "channel=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=stable" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up QEMU (for arm64 emulation)
         uses: docker/setup-qemu-action@v4
 
@@ -38,6 +57,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # latest=auto adds :latest only for non-prerelease semver tags, and the
+      # {{major}}.{{minor}} pattern is skipped for pre-releases automatically.
       - name: Image metadata (tags + labels)
         id: meta
         uses: docker/metadata-action@v6
@@ -46,7 +67,8 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=raw,value=beta,enable=${{ startsWith(github.ref, 'refs/tags/') && steps.channel.outputs.channel == 'beta' }}
+            type=raw,value=stable,enable=${{ startsWith(github.ref, 'refs/tags/') && steps.channel.outputs.channel == 'stable' }}
             type=sha
 
       - name: Build & push (amd64 + arm64)
@@ -65,11 +87,18 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           version="${GITHUB_REF_NAME#v}"
-          awk -v v="$version" '
-            $0 ~ "^## \\[" v "\\]" {grab=1; next}
-            grab && /^## / {exit}
-            grab {print}
-          ' CHANGELOG.md > RELEASE_NOTES.md
+          base="${version%-beta.*}"
+          extract() {
+            awk -v v="$1" '
+              $0 ~ "^## \\[" v "\\]" {grab=1; next}
+              grab && /^## / {exit}
+              grab {print}
+            ' CHANGELOG.md
+          }
+          # Betas usually ship before the CHANGELOG section is finalised — fall
+          # back to the base version's section, then to a generic pointer.
+          extract "$version" > RELEASE_NOTES.md
+          [ -s RELEASE_NOTES.md ] || extract "$base" > RELEASE_NOTES.md
           if [ ! -s RELEASE_NOTES.md ]; then
             echo "See [CHANGELOG.md](CHANGELOG.md)." > RELEASE_NOTES.md
           fi
@@ -87,3 +116,18 @@ jobs:
         with:
           body_path: RELEASE_NOTES.md
           generate_release_notes: true
+          prerelease: ${{ steps.channel.outputs.channel == 'beta' }}
+
+  # Every published beta kicks the promotion counter: the 4th positive beta
+  # since the last stable release triggers the stable release automatically.
+  promote-check:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, '-beta.')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch the promote workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run promote.yml -R "$GITHUB_REPOSITORY"

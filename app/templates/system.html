@@ -45,6 +45,53 @@
   </table>
 </div>
 
+<div class="card gap" id="updates">
+  <h2>Updates <span class="sub">installed: v{{ updates.current }} · {{ updates.channel }} channel</span></h2>
+
+  {% if updates.available %}
+  <p>
+    <span class="badge idle">update</span>
+    <strong>{{ updates.available.tag }}</strong>{% if updates.available.prerelease %} (beta){% endif %}
+    is available{% if updates.available.published %}, released {{ updates.available.published }}{% endif %}
+    — <a href="{{ updates.available.url }}" target="_blank">release notes</a>.
+  </p>
+  {% if updates.can_apply %}
+  <form class="inline" method="post" action="/system/updates/apply">
+    <input type="hidden" name="tag" value="{{ updates.available.tag }}">
+    <button class="btn sm">Install {{ updates.available.tag }} now</button>
+  </form>
+  <div class="help gap">Installing downloads the release from GitHub and restarts the
+    panel; progress is logged to <span class="mono">/var/log/prntbtlr-update.log</span>.</div>
+  {% else %}
+  <div class="help gap">Running in a container — update by pulling the new image:
+    <span class="mono">docker pull ghcr.io/{{ update_repo }}:{{ updates.available.version }}</span></div>
+  {% endif %}
+  {% else %}
+  <p class="muted">You are up to date.</p>
+  {% endif %}
+
+  <form method="post" action="/system/updates/settings" class="gap">
+    <div class="field-row">
+      <label class="check"><input type="checkbox" name="beta" value="true"
+        {{ 'checked' if updates.channel == 'beta' }}>
+        Beta channel <span class="muted">— also receive pre-releases</span></label>
+      <label class="check"><input type="checkbox" name="auto" value="true"
+        {{ 'checked' if updates.auto_update }}>
+        Install updates automatically <span class="muted">— unticked: notify only</span></label>
+    </div>
+    <div class="btn-row gap">
+      <button class="btn sm" type="submit">Save update settings</button>
+    </div>
+  </form>
+  <form class="inline gap" method="post" action="/system/updates/check">
+    <button class="btn ghost sm" type="submit">Check for updates now</button>
+  </form>
+  <div class="help gap">Last check: {{ updates.last_check or 'never' }}{% if updates.last_error %}
+    — failed: <span class="mono">{{ updates.last_error }}</span>{% endif %}.
+    Updates come from <a href="https://github.com/{{ update_repo }}/releases" target="_blank">GitHub
+    Releases</a> only.</div>
+</div>
+
 <div class="card gap">
   <h2>Useful links</h2>
   <div class="btn-row">

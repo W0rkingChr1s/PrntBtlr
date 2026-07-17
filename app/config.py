@@ -86,5 +86,19 @@ class Settings(BaseSettings):
     # Scanning can take a while (warm-up + ADF); give it room.
     scan_timeout: int = 300
 
+    # --- Updates ------------------------------------------------------------
+    # The panel updates itself from this repo's GitHub Releases. Two channels:
+    # "stable" (default) sees full releases only, "beta" also sees
+    # pre-releases. Channel + auto-install vs. notify-only are toggled on the
+    # System page and persisted in ``update_state_file``.
+    update_repo: str = "w0rkingchr1s/prntbtlr"
+    update_api_base: str = "https://api.github.com"
+    update_state_file: Path = Path("/etc/prntbtlr/updater.json")
+    # Self-update script, installed next to the app by scripts/install.sh.
+    update_script: Path = Path("/opt/prntbtlr/update.sh")
+    # Seconds between automatic update checks (0 disables the background
+    # checker; "Check now" on the System page always works).
+    update_check_interval: int = 6 * 3600
+
 
 settings = Settings()
