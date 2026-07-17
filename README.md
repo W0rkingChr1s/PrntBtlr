@@ -335,7 +335,7 @@ flowchart LR
     Browser["🌐 Browser"] -->|"control panel :80"| Pi
     Finder["📁 Finder"] -->|"SMB"| Pi
 
-    subgraph Pi["🍓 Raspberry Pi"]
+    subgraph Pi["Raspberry Pi"]
         direction TB
         Panel["PrntBtlr panel · :80"]
         CUPS["CUPS + Gutenprint"]
