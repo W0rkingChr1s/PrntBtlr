@@ -1,4 +1,8 @@
-# 🖨️ PrntBtlr
+<div align="center">
+
+<img src="docs/images/banner.svg" alt="PrntBtlr — your Raspberry Pi print & scan butler" width="100%">
+
+<br>
 
 [![CI](https://github.com/w0rkingchr1s/prntbtlr/actions/workflows/ci.yml/badge.svg)](https://github.com/w0rkingchr1s/prntbtlr/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -6,23 +10,50 @@
 [![GHCR](https://img.shields.io/badge/ghcr.io-prntbtlr-2496ED?logo=docker&logoColor=white)](https://github.com/w0rkingchr1s/prntbtlr/pkgs/container/prntbtlr)
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-**Your Raspberry Pi print & scan butler.** Plug an old USB printer/scanner into a
-Raspberry Pi and PrntBtlr turns it into a modern, network-shared print + scan
-station — with a clean web control panel on **port 80** instead of fiddling on
-the command line.
+**Plug an old USB printer/scanner into a Raspberry Pi and PrntBtlr turns it into a
+modern, network-shared print + scan station** — with a clean web control panel on
+**port 80** instead of fiddling on the command line.
+
+[Quick start](#-quick-start) · [Screenshots](#-the-control-panel) · [How it works](#-how-it-fits-together) · [Updates](#-updates) · [Docker](#-running-it-another-way) · [Config](#-configuration)
+
+</div>
+
+---
 
 It does what a hand-rolled CUPS + scanbd + Samba setup does, but wraps the daily
 tasks in a friendly UI:
 
-- **Print** — AirPrint/IPP sharing so Macs & iPhones can print to the old printer.
-- **Scan** — press the scan button on the printer → PDF lands in a network folder
-  (`/srv/scans`, shared over SMB). Or scan on demand from the browser.
-- **Manage** — add/remove printers, watch & clear the queue, pause/resume,
-  set the error policy, control services, all from one panel.
+<table>
+<tr>
+<td width="33%" valign="top">
+
+### 🖨️ Print
+AirPrint/IPP sharing so Macs & iPhones can print straight to the old printer — no drivers, no queue-wrangling.
+
+</td>
+<td width="33%" valign="top">
+
+### 📄 Scan
+Press the scan button → a PDF lands in a network folder (`/srv/scans`, shared over SMB). Or scan on demand from the browser.
+
+</td>
+<td width="33%" valign="top">
+
+### ⚙️ Manage
+Add/remove printers, watch & clear the queue, pause/resume, set the error policy, control services — all from one panel.
+
+</td>
+</tr>
+</table>
+
+<div align="center">
+<img src="docs/images/panel-dashboard.png" alt="PrntBtlr dashboard — printers, queue, services, scans and host at a glance" width="90%">
+<br><sub><b>The dashboard</b> — printers, print queue, services, recent scans and host info at a glance.</sub>
+</div>
 
 ---
 
-## Quick start
+## 🚀 Quick start
 
 The installer assumes a **blank system** (a fresh Raspberry Pi OS / Debian box)
 and brings everything it needs. Connect the printer by USB, then either:
@@ -43,7 +74,10 @@ sudo ./scripts/install.sh
 
 Then open **`http://<pi-ip>/`** and add your printer under **Printers → Add printer**.
 
-Useful installer flags:
+<details>
+<summary><b>Useful installer flags</b></summary>
+
+<br>
 
 | Command | Effect |
 |---------|--------|
@@ -54,7 +88,20 @@ Useful installer flags:
 | `sudo NO_FIREWALL=1 ./scripts/install.sh` | Don't touch ufw. |
 | `sudo SKIP_APT=1 ./scripts/install.sh` | Re-deploy the app only (skip package install). |
 
+</details>
+
 ### What the installer does
+
+```mermaid
+flowchart LR
+    A["🔎 Pre-flight<br/>checks"] --> B["📦 Install<br/>CUPS · SANE · Samba"]
+    B --> C["🔧 Configure<br/>shares · USB · groups"]
+    C --> D["🚀 Deploy panel<br/>+ enable services"]
+    D --> E["✅ Health-check<br/>the panel"]
+
+    classDef step fill:#1b2436,stroke:#2a3550,color:#e7ecf5;
+    class A,B,C,D,E step;
+```
 
 1. **Pre-flight checks** — root, supported OS, architecture, network, Python ≥ 3.9,
    and whether the target port is already taken.
@@ -71,9 +118,9 @@ Useful installer flags:
 10. Deploys the control panel to `/opt/prntbtlr` in a venv, runs it as a systemd
     service, and **verifies the panel actually answers** before declaring success.
 
-Every config file it touches is backed up as `<file>.bak.<timestamp>` first, the
-script is **idempotent** (re-running is also the upgrade path), and the full
-output is logged to `/var/log/prntbtlr-install.log`.
+> Every config file it touches is backed up as `<file>.bak.<timestamp>` first, the
+> script is **idempotent** (re-running is also the upgrade path), and the full
+> output is logged to `/var/log/prntbtlr-install.log`.
 
 ### The scan button
 
@@ -103,14 +150,20 @@ sudo systemctl enable --now scanbd
 
 Scanning from the **web panel** works without any of this.
 
-**Pressed the button and nothing happened?** Check the handler is running and
-watch the log — each scan logs there:
+<details>
+<summary><b>Pressed the button and nothing happened?</b></summary>
+
+<br>
+
+Check the handler is running and watch the log — each scan logs there:
 
 ```bash
 systemctl status prntbtlr-scan-listen    # Canon PIXMA (or: scanbd, others)
 journalctl -t prntbtlr -n 20             # "button scan fired …" / "scan saved …"
 sudo scanimage -L                        # confirm SANE sees the scanner
 ```
+
+</details>
 
 **Searchable PDFs (OCR).** Install OCR with `sudo ENABLE_OCR=1 ./scripts/install.sh`
 (add languages with `OCR_LANGS="eng deu"`), then tick **Searchable PDF (OCR)** in
@@ -119,21 +172,38 @@ the panel's scan form. To OCR button scans too, add `PRNTBTLR_OCR=1` to
 
 ---
 
-## The control panel
+## 🖥️ The control panel
 
 | Page | What you can do |
 |------|-----------------|
 | **Dashboard** | Live status of printers, queue, services, storage and recent scans. |
 | **Printers** | Add/remove printers, test page, pause/resume, clear queue, error policy, AirPrint sharing. |
 | **Scans** | Scan on demand (source/mode/DPI), browse, view, download and delete saved PDFs. |
-| **System** | Service status + restart, host info, links to CUPS admin. |
+| **System** | Service status + restart, host info, updates, links to CUPS admin. |
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/panel-printers.png" alt="Printers page"><br><sub><b>Printers</b> — test, pause, clear queue, error policy & AirPrint sharing.</sub></td>
+<td width="50%"><img src="docs/images/panel-scans.png" alt="Scans page"><br><sub><b>Scans</b> — scan on demand and manage saved PDFs.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/images/panel-system.png" alt="System page"><br><sub><b>System</b> — services, host info and self-updates.</sub></td>
+<td width="50%" valign="middle">
 
 The UI is server-rendered (Jinja2) with a small bit of vanilla JS for live
 status polling — **no build step, no CDN, works fully offline** on the Pi's LAN.
 
+Dark theme, zero external dependencies, and it degrades gracefully when
+CUPS/SANE aren't installed (handy for developing on a laptop): pages render and
+show "not installed" instead of crashing.
+
+</td>
+</tr>
+</table>
+
 ---
 
-## Updates
+## 🔄 Updates
 
 PrntBtlr updates itself from **GitHub Releases** — no `git pull` needed. Two
 channels:
@@ -172,15 +242,15 @@ sudo /opt/prntbtlr/update.sh v0.2.0-beta.3     # beta release
 **Docker** installs don't self-apply — the image *is* the update path. Pull the
 new image instead (`:latest`/`:stable` or `:beta`) and recreate the container.
 
-For maintainers: releases are cut entirely from the GitHub website — **Actions
-→ Cut release** picks the next version tag itself (no CLI needed). Betas ship
-as GitHub pre-releases, and **4 positive betas** since the last stable release
-are promoted to a stable release automatically — or earlier on demand. See
-[`CONTRIBUTING.md`](CONTRIBUTING.md) for the release flow.
+> For maintainers: releases are cut entirely from the GitHub website — **Actions
+> → Cut release** picks the next version tag itself (no CLI needed). Betas ship
+> as GitHub pre-releases, and **4 positive betas** since the last stable release
+> are promoted to a stable release automatically — or earlier on demand. See
+> [`CONTRIBUTING.md`](CONTRIBUTING.md) for the release flow.
 
 ---
 
-## Running it another way
+## 🐳 Running it another way
 
 ### Docker
 
@@ -215,7 +285,7 @@ crashing.
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
 Settings come from environment variables (prefix `PRNTBTLR_`) or
 `/etc/prntbtlr/prntbtlr.env`. Common ones:
@@ -257,22 +327,28 @@ never stored. To generate a hash yourself:
 
 ---
 
-## How it fits together
+## 🧩 How it fits together
 
-```
-  Mac / iPhone ──AirPrint/IPP──┐
-                               ▼
-                   ┌──────────────────────┐      USB
-                   │   Raspberry Pi        │ ───────────►  Old printer/scanner
-                   │                       │ ◄───────────
-                   │  CUPS + Gutenprint    │   scan button
-                   │  scanbd → scan2pdf.sh │
-                   │  Samba  → /srv/scans  │
-                   │  PrntBtlr panel :80   │
-                   └──────────────────────┘
-                               ▲
-        Browser ───────────────┘ (control panel)
-        Finder ──SMB──► smb://<pi>/scans (your PDFs)
+```mermaid
+flowchart LR
+    Mac["💻 Mac / iPhone"] -->|"AirPrint / IPP"| Pi
+    Browser["🌐 Browser"] -->|"control panel :80"| Pi
+    Finder["📁 Finder"] -->|"SMB"| Pi
+
+    subgraph Pi["🍓 Raspberry Pi"]
+        direction TB
+        Panel["PrntBtlr panel · :80"]
+        CUPS["CUPS + Gutenprint"]
+        Scan["scanbd / scan-listen<br/>→ scan2pdf.sh"]
+        Samba["Samba → /srv/scans"]
+    end
+
+    Pi -->|"USB"| Printer["🖨️ Old printer / scanner"]
+    Printer -.->|"scan button"| Pi
+
+    classDef pi fill:#2b3c63,stroke:#4f8cff,color:#e7ecf5;
+    classDef node fill:#1b2436,stroke:#2a3550,color:#e7ecf5;
+    class Mac,Browser,Finder,Printer node;
 ```
 
 PrntBtlr drives the standard tools via their CLIs (`lpadmin`, `lpstat`,
@@ -282,18 +358,19 @@ listener described above (`scanbd` handles the button on everything else).
 
 ---
 
-## Security
+## 🔒 Security
 
 The systemd service runs as **root** because it manages CUPS, SANE and systemd,
 which need privileges. That's a reasonable trade-off for a single-purpose home
-print server on a trusted LAN. The panel has **no authentication** — don't expose
-port 80 to the internet. To harden: put it behind a reverse proxy with auth, or
-restrict access by firewall. The Samba share defaults to guest access (`guest ok`)
-for convenience; switch to `guest ok = no` + `smbpasswd` for a locked-down share.
+print server on a trusted LAN. The panel has **no authentication** by default —
+don't expose port 80 to the internet. To harden: put it behind a reverse proxy
+with auth, or restrict access by firewall. The Samba share defaults to guest
+access (`guest ok`) for convenience; switch to `guest ok = no` + `smbpasswd` for
+a locked-down share.
 
 ---
 
-## Uninstall
+## 🧹 Uninstall
 
 ```bash
 sudo ./scripts/uninstall.sh                 # remove the panel + service
@@ -304,13 +381,13 @@ Your scans in `/srv/scans` are left untouched.
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome! See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the dev
 setup and workflow, and please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 Found a security issue? See [`SECURITY.md`](SECURITY.md) — don't open a public
 issue. Changes are tracked in [`CHANGELOG.md`](CHANGELOG.md).
 
-## License
+## 📄 License
 
 MIT © Christoph Zeitler — see [`LICENSE`](LICENSE).
