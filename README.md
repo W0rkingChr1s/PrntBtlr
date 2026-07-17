@@ -148,12 +148,29 @@ Configure it under **System → Updates** with two checkboxes:
 | **Beta channel** | Also offer pre-releases (unticked: stable releases only). |
 | **Install updates automatically** | Apply new releases as they appear. Unticked = **notify only**: a banner appears in the panel and you install with one click. |
 
-The panel checks every 6 hours (`PRNTBTLR_UPDATE_CHECK_INTERVAL` in seconds,
-`0` disables the background check; "Check for updates now" always works).
-Installing downloads the release tarball, re-runs the bundled installer and
-restarts the panel — progress lands in `/var/log/prntbtlr-update.log`. Docker
-installs update by pulling the new image instead (`:latest`/`:stable` or
-`:beta`).
+Both settings persist across restarts and updates (in
+`/etc/prntbtlr/updater.json`). The panel checks GitHub every 6 hours
+(`PRNTBTLR_UPDATE_CHECK_INTERVAL` in seconds, `0` disables the background
+check; **Check for updates now** always works) and picks the newest release on
+your channel — a release marked `[failed]` (in its title or notes) is skipped.
+
+**What installing does.** For the chosen tag the panel runs its self-updater
+([`scripts/update.sh`](scripts/update.sh)): it downloads that release's
+tarball, stamps the version into the app, and re-runs the bundled installer
+(`SKIP_APT=1` — app only, no package churn), which redeploys `/opt/prntbtlr`,
+restarts the service and health-checks the panel. It runs in a transient
+systemd unit so the restart at the end can't kill the update mid-way, and every
+step is logged to `/var/log/prntbtlr-update.log`.
+
+Prefer the command line? Run the same updater by hand:
+
+```bash
+sudo /opt/prntbtlr/update.sh v0.2.0            # stable release
+sudo /opt/prntbtlr/update.sh v0.2.0-beta.3     # beta release
+```
+
+**Docker** installs don't self-apply — the image *is* the update path. Pull the
+new image instead (`:latest`/`:stable` or `:beta`) and recreate the container.
 
 For maintainers: releases are cut entirely from the GitHub website — **Actions
 → Cut release** picks the next version tag itself (no CLI needed). Betas ship
