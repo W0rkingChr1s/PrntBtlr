@@ -69,8 +69,17 @@ class Settings(BaseSettings):
     # "eng", "deu", or "deu+eng". Only used when OCR is requested and installed.
     ocr_lang: str = "eng"
 
-    # systemd units surfaced on the dashboard.
-    services: tuple[str, ...] = ("cups", "scanbd", "smbd", "avahi-daemon")
+    # systemd units surfaced on the dashboard. On a Canon PIXMA the button is
+    # handled by prntbtlr-scan-listen and scanbd is intentionally disabled; on
+    # other scanners it's the reverse — so both are shown (whichever is idle
+    # simply reads "inactive"/"not installed").
+    services: tuple[str, ...] = (
+        "cups",
+        "scanbd",
+        "prntbtlr-scan-listen",
+        "smbd",
+        "avahi-daemon",
+    )
 
     # Timeout (seconds) for short discovery shell-outs.
     command_timeout: int = 30
