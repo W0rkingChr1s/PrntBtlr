@@ -362,6 +362,8 @@ mkdir -p "$APP_DIR"
 rm -rf "$APP_DIR/app"
 cp -a "$REPO_DIR/app" "$APP_DIR/"
 cp -a "$REPO_DIR/requirements.txt" "$REPO_DIR/pyproject.toml" "$APP_DIR/" 2>/dev/null || true
+# Self-updater (System → Updates pulls release tarballs and re-runs install.sh).
+install -m 0755 "$REPO_DIR/scripts/update.sh" "$APP_DIR/update.sh"
 
 if [ ! -d "$APP_DIR/.venv" ]; then
   python3 -m venv "$APP_DIR/.venv"

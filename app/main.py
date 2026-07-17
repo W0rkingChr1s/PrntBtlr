@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import secrets
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -16,12 +18,28 @@ from .auth import auth_is_usable
 from .config import settings
 from .routes import auth as auth_routes
 from .routes import dashboard, printers, scans, system_routes
+from .services import updater
 from .services import system
 
 log = logging.getLogger("prntbtlr")
 logging.basicConfig(level=logging.DEBUG if settings.debug else logging.INFO)
 
-app = FastAPI(title=settings.app_name, version=__version__)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Background update checker (channel + auto/notify are set on the System
+    # page); PRNTBTLR_UPDATE_CHECK_INTERVAL=0 disables it.
+    task = None
+    if settings.update_check_interval > 0:
+        task = asyncio.create_task(updater.background_loop())
+    yield
+    if task:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(title=settings.app_name, version=__version__, lifespan=lifespan)
 
 # Paths reachable without a session even when auth is on.
 _PUBLIC_PREFIXES = ("/login", "/logout", "/static", "/healthz", "/favicon")

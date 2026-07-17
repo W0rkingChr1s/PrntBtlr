@@ -63,20 +63,48 @@ shellcheck scripts/*.sh     # shell scripts
 
 ## Releasing
 
-Releases are tag-driven. To cut one:
+Releases are tag-driven, and **GitHub Releases are the only distribution
+channel** — the panel's built-in updater feeds from them. There are two
+channels:
 
-1. Move the relevant `## [Unreleased]` notes in [`CHANGELOG.md`](CHANGELOG.md)
-   under a new `## [x.y.z] - YYYY-MM-DD` heading, and bump `version` in
-   `pyproject.toml` / `app/__init__.py`.
-2. Tag and push:
+### Beta releases
 
-   ```bash
-   git tag v0.2.0 && git push origin v0.2.0
-   ```
+Cut one whenever there is something to test:
 
-The **Release** workflow then builds a multi-arch image
-(`ghcr.io/w0rkingchr1s/prntbtlr:0.2.0` + `:latest`) and creates a GitHub Release
-with notes pulled from the matching CHANGELOG section.
+```bash
+git tag v0.2.0-beta.1 && git push origin v0.2.0-beta.1
+```
+
+The **Release** workflow marks it as a GitHub *pre-release* and pushes the
+image as `:0.2.0-beta.1` + `:beta`. Panels on the **beta channel** pick it up;
+the stable channel never sees it. CHANGELOG notes may stay under
+`## [Unreleased]` until the stable release (the workflow falls back to the base
+version's section, then to a generic pointer).
+
+**Marking a bad beta:** edit the beta's GitHub release and put `[failed]` in
+its title or notes (or delete the release). It then no longer counts towards
+promotion, and beta-channel panels skip it.
+
+### Stable releases
+
+Normally **automatic**: after **4 positive betas** since the last stable
+release, the **Promote beta to stable** workflow tags the latest beta's commit
+as `vX.Y.Z` (the beta version without its `-beta.N` suffix) and re-runs the
+Release workflow for it — full GitHub release, image tags `:x.y.z`, `:x.y`,
+`:stable` and `:latest`.
+
+To cut a stable release **earlier**, either run the *Promote beta to stable*
+workflow manually with **force** ticked (Actions tab), or tag by hand:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+Before (or right after) a stable release, move the `## [Unreleased]` notes in
+[`CHANGELOG.md`](CHANGELOG.md) under a `## [x.y.z] - YYYY-MM-DD` heading and
+bump `version` in `pyproject.toml` / `app/__init__.py`. (The self-updater
+stamps the installed version from the release tag, so a missed bump doesn't
+break updates — but keeping them in sync keeps the repo honest.)
 
 ## Reporting bugs / requesting features
 

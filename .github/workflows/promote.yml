@@ -1,0 +1,97 @@
+name: Promote beta to stable
+
+# Counts the "positive" betas published since the last stable release and cuts
+# the stable release once BETAS_REQUIRED (4) is reached: the latest beta's
+# commit is tagged vX.Y.Z (its version without the -beta.N suffix) and the
+# Release workflow is run for that tag.
+#
+# - Dispatched automatically by release.yml after every beta (force=false).
+# - Run it manually with force=true to cut the stable release EARLY, before
+#   4 betas have accumulated (Actions → "Promote beta to stable" → Run).
+#
+# A beta counts as positive unless it has been marked bad: edit its GitHub
+# release title or notes to contain "[failed]" (or delete the release) and it
+# no longer counts — the panel's beta-channel updater skips it too.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Promote now, even with fewer than 4 positive betas"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # push the stable tag
+  actions: write    # run release.yml for the new tag
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+env:
+  BETAS_REQUIRED: 4
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Count positive betas since the last stable release
+        id: count
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          releases="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100")"
+
+          last_stable="$(jq -r '
+            [ .[] | select(.draft == false and .prerelease == false) ]
+            | max_by(.published_at) | .published_at // empty' <<<"$releases")"
+
+          positive="$(jq --arg since "$last_stable" '
+            [ .[]
+              | select(.draft == false and .prerelease == true)
+              | select(($since == "") or (.published_at > $since))
+              | select(.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-beta\\.[0-9]+$"))
+              | select(((.name // "") + " " + (.body // ""))
+                       | ascii_downcase | contains("[failed]") | not)
+            ]' <<<"$releases")"
+
+          count="$(jq length <<<"$positive")"
+          latest_beta="$(jq -r 'max_by(.published_at) | .tag_name // empty' <<<"$positive")"
+
+          {
+            echo "count=$count"
+            echo "latest_beta=$latest_beta"
+          } >> "$GITHUB_OUTPUT"
+          echo "Positive betas since last stable: $count of $BETAS_REQUIRED" \
+               "(latest: ${latest_beta:-none}, last stable: ${last_stable:-none})"
+
+      - name: Cut the stable release
+        if: steps.count.outputs.latest_beta != '' && (inputs.force || fromJSON(steps.count.outputs.count) >= fromJSON(env.BETAS_REQUIRED))
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST_BETA: ${{ steps.count.outputs.latest_beta }}
+        run: |
+          stable_tag="${LATEST_BETA%-beta.*}"
+          if git rev-parse -q --verify "refs/tags/$stable_tag" >/dev/null; then
+            echo "::notice::$stable_tag already exists — nothing to promote."
+            exit 0
+          fi
+          commit="$(git rev-list -n1 "$LATEST_BETA")"
+          git tag "$stable_tag" "$commit"
+          git push origin "refs/tags/$stable_tag"
+          # A tag pushed with GITHUB_TOKEN doesn't fire release.yml's tag
+          # trigger, so run the workflow for the new tag explicitly.
+          gh workflow run release.yml -R "$GITHUB_REPOSITORY" --ref "refs/tags/$stable_tag"
+          echo "::notice::Promoted $LATEST_BETA → $stable_tag (release workflow dispatched)"
+
+      - name: Not enough positive betas yet
+        if: steps.count.outputs.latest_beta == '' || (!inputs.force && fromJSON(steps.count.outputs.count) < fromJSON(env.BETAS_REQUIRED))
+        run: |
+          echo "No promotion: ${{ steps.count.outputs.count }} of $BETAS_REQUIRED positive" \
+               "betas since the last stable release. Run this workflow with force=true" \
+               "to promote early."

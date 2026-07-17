@@ -133,6 +133,35 @@ status polling — **no build step, no CDN, works fully offline** on the Pi's LA
 
 ---
 
+## Updates
+
+PrntBtlr updates itself from **GitHub Releases** — no `git pull` needed. Two
+channels:
+
+- **Stable** (default) — full releases only (`vX.Y.Z`).
+- **Beta** — additionally receives pre-releases (`vX.Y.Z-beta.N`).
+
+Configure it under **System → Updates** with two checkboxes:
+
+| Checkbox | Effect |
+|----------|--------|
+| **Beta channel** | Also offer pre-releases (unticked: stable releases only). |
+| **Install updates automatically** | Apply new releases as they appear. Unticked = **notify only**: a banner appears in the panel and you install with one click. |
+
+The panel checks every 6 hours (`PRNTBTLR_UPDATE_CHECK_INTERVAL` in seconds,
+`0` disables the background check; "Check for updates now" always works).
+Installing downloads the release tarball, re-runs the bundled installer and
+restarts the panel — progress lands in `/var/log/prntbtlr-update.log`. Docker
+installs update by pulling the new image instead (`:latest`/`:stable` or
+`:beta`).
+
+For maintainers: betas ship as GitHub pre-releases, and **4 positive betas**
+since the last stable release are promoted to a stable release automatically —
+or earlier on demand. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the release
+flow.
+
+---
+
 ## Running it another way
 
 ### Docker

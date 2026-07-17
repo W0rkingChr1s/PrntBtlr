@@ -7,6 +7,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Self-updater with release channels.** The panel now updates itself straight
+  from GitHub Releases (the only distribution channel): a **stable** channel
+  (`vX.Y.Z`) and a **beta** channel (`vX.Y.Z-beta.N`, GitHub pre-releases),
+  selected with a checkbox under **System → Updates**, plus a second checkbox
+  choosing **install automatically** vs. **notify only** (banner in the panel +
+  one-click install). A background check runs every 6 h
+  (`PRNTBTLR_UPDATE_CHECK_INTERVAL`, `0` disables); applying an update runs the
+  new `scripts/update.sh` (fetch release tarball → re-run the bundled
+  installer) in a transient systemd unit so the panel restart can't kill the
+  update. Container installs are detected and pointed at `docker pull` instead.
+- **Release automation for the two channels**: beta tags publish GitHub
+  pre-releases with image tags `:x.y.z-beta.n` + `:beta`; stable tags publish
+  full releases with `:x.y.z`, `:x.y`, `:stable` + `:latest`. A new **promote**
+  workflow counts the positive betas since the last stable release — after
+  **4** it automatically tags the latest beta as the stable release, and it can
+  be dispatched manually (`force=true`) to cut a stable release earlier. A beta
+  is excluded by putting `[failed]` in its release title/notes.
 - `/healthz` now reports the state of the monitored systemd services (the same
   units shown on the dashboard: `cups`, `scanbd`, `prntbtlr-scan-listen`,
   `smbd`, …) keyed by unit name, each with `status`, `active`, `enabled` and a
