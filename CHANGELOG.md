@@ -69,7 +69,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the new USB-interrupt listener (see Added) handles it instead. The installer
   still ships a ready-to-use scanbd action config (`config/scanbd-pixma.conf`,
   wiring `button-1`/`button-2`, included from `scanbd.conf`) for PIXMAs whose
-  buttons *are* pollable and as the path for non-Canon scanners.
+  buttons *are* pollable; non-Canon scanners use the separate
+  `config/scanbd-action.conf` template instead.
 - `scan2pdf.sh` now retries a briefly-busy scanner and only writes a PDF once a
   page actually converts, so a failed/partial scan can't leave a 0-byte PDF, and
   logs each firing (`journalctl -t prntbtlr`) to make button scans diagnosable.
