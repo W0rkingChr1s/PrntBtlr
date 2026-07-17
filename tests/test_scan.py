@@ -14,12 +14,17 @@ def test_ocr_available(monkeypatch):
 
 
 def _wire_fake_scan(monkeypatch, tmp_path, *, ocr_installed=True):
-    """Stub out scanimage + img2pdf (+ optionally ocrmypdf) with real file writes."""
+    """Stub out scanimage + img2pdf (+ optionally ocrmypdf) with real file writes.
+
+    Returns a dict capturing the commands that were run, for asserting on flags.
+    """
     monkeypatch.setattr(settings, "scan_dir", tmp_path)
     monkeypatch.setattr(scan, "available", lambda: True)
     monkeypatch.setattr(scan, "first_device", lambda: "pixma")
+    captured = {"scanimage": None, "runs": []}
 
     def fake_scan_to_file(cmd, dest):
+        captured["scanimage"] = cmd
         Path(dest).write_bytes(b"II*\x00fake-tiff")
         return scan.shell.Result(True, 0, "", "")
 
@@ -31,11 +36,13 @@ def _wire_fake_scan(monkeypatch, tmp_path, *, ocr_installed=True):
     )
 
     def fake_run(cmd, **k):
+        captured["runs"].append(cmd)
         out = cmd[cmd.index("-o") + 1] if "-o" in cmd else cmd[-1]
         Path(out).write_bytes(b"%PDF-1.4\n")
         return scan.shell.Result(True, 0, "", "")
 
     monkeypatch.setattr(scan.shell, "run", fake_run)
+    return captured
 
 
 def test_scan_now_with_ocr(tmp_path, monkeypatch):
@@ -52,6 +59,35 @@ def test_scan_now_ocr_requested_but_unavailable(tmp_path, monkeypatch):
     ok, msg, path = scan.scan_now(ocr=True)
     assert ok and path is not None and path.exists()  # plain scan still saved
     assert "OCR skipped" in msg
+
+
+def test_scan_now_defaults_to_a4(tmp_path, monkeypatch):
+    captured = _wire_fake_scan(monkeypatch, tmp_path)
+    ok, _, _ = scan.scan_now()
+    assert ok
+    cmd = captured["scanimage"]
+    assert cmd[cmd.index("-x") + 1] == "210"
+    assert cmd[cmd.index("-y") + 1] == "297"
+    # The PDF page box is pinned to the exact standard size.
+    img2pdf_cmd = captured["runs"][0]
+    assert img2pdf_cmd[img2pdf_cmd.index("--pagesize") + 1] == "A4"
+
+
+def test_scan_now_max_paper_scans_full_bed(tmp_path, monkeypatch):
+    captured = _wire_fake_scan(monkeypatch, tmp_path)
+    ok, _, _ = scan.scan_now(paper="Max")
+    assert ok
+    cmd = captured["scanimage"]
+    assert "-x" not in cmd and "-y" not in cmd
+    assert "--pagesize" not in captured["runs"][0]
+
+
+def test_scan_now_leaves_no_intermediates(tmp_path, monkeypatch):
+    _wire_fake_scan(monkeypatch, tmp_path)
+    ok, _, path = scan.scan_now(ocr=True)
+    assert ok and path is not None and path.exists()
+    # Only the finished PDF remains — no .tiff, .part, or .ocr intermediates.
+    assert [p.name for p in tmp_path.iterdir()] == [path.name]
 
 
 def test_list_devices_parses_scanimage(monkeypatch):
@@ -88,3 +124,14 @@ def test_list_scans_sorted_newest_first(tmp_path, monkeypatch):
 
     scans = scan.list_scans()
     assert [s.name for s in scans] == ["scan_new.pdf", "scan_old.pdf"]
+
+
+def test_list_scans_ignores_in_progress_dotfiles(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "scan_dir", tmp_path)
+    (tmp_path / "scan_done.pdf").write_bytes(b"%PDF done")
+    (tmp_path / ".prntbtlr_x.pdf.part").write_bytes(b"")
+    (tmp_path / ".prntbtlr_x.tiff").write_bytes(b"II*\x00")
+    (tmp_path / ".hidden.pdf").write_bytes(b"%PDF hidden")
+
+    assert [s.name for s in scan.list_scans()] == ["scan_done.pdf"]
+    assert scan.resolve_scan(".hidden.pdf") is None

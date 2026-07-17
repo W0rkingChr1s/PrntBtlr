@@ -65,6 +65,11 @@ class Settings(BaseSettings):
     # Default SANE device fallback when none is auto-detected.
     default_scan_device: str = "pixma"
 
+    # Default paper size for browser scans: A4, Letter, Legal, or Max (full
+    # scanner bed). The same PRNTBTLR_SCAN_PAPER environment variable is read by
+    # scan2pdf.sh for button scans.
+    scan_paper: str = "A4"
+
     # OCR (searchable PDFs) via ocrmypdf. Language(s) for tesseract, e.g.
     # "eng", "deu", or "deu+eng". Only used when OCR is requested and installed.
     ocr_lang: str = "eng"

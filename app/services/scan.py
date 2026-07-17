@@ -19,6 +19,24 @@ from . import shell
 # ``device `pixma:MX870_1A2B3C' is a CANON Canon PIXMA MX870 ...``
 _DEVICE_RE = re.compile(r"device `(?P<dev>[^']+)' is a (?P<desc>.+)$")
 
+# Scan-window sizes in mm. Without an explicit -x/-y, scanners scan their
+# maximum area (216x356 mm on a PIXMA ADF), so pages come out oversized instead
+# of A4/Letter. "Max" (no entry) keeps the full bed.
+PAPER_SIZES: dict[str, tuple[float, float]] = {
+    "A4": (210.0, 297.0),
+    "Letter": (215.9, 279.4),
+    "Legal": (215.9, 355.6),
+}
+PAPER_CHOICES: tuple[str, ...] = ("A4", "Letter", "Legal", "Max")
+
+
+def _paper_dims(paper: str) -> tuple[str, tuple[float, float] | None]:
+    """Normalize a paper name; returns ``(canonical_name, (w_mm, h_mm) | None)``."""
+    for name, dims in PAPER_SIZES.items():
+        if name.lower() == paper.strip().lower():
+            return name, dims
+    return "Max", None
+
 
 @dataclass
 class ScanDevice:
@@ -89,14 +107,21 @@ def scan_now(
     source: str = "Flatbed",
     mode: str = "Color",
     resolution: int = 300,
+    paper: str | None = None,
     ocr: bool = False,
 ) -> tuple[bool, str, Path | None]:
     """Perform a single scan and convert it to a PDF in :data:`settings.scan_dir`.
 
-    When *ocr* is true and ocrmypdf is installed, the PDF is post-processed into a
-    searchable PDF (text layer via tesseract). Returns ``(ok, message, path)``.
-    The heavy lifting (multi-page ADF batches) lives in ``scan2pdf.sh``; from the
-    browser we keep it to a single page so the request stays predictable.
+    *paper* constrains the scan window (default :data:`settings.scan_paper`, A4);
+    ``"Max"`` scans the full bed. When *ocr* is true and ocrmypdf is installed,
+    the PDF is post-processed into a searchable PDF (text layer via tesseract).
+    Returns ``(ok, message, path)``. The heavy lifting (multi-page ADF batches)
+    lives in ``scan2pdf.sh``; from the browser we keep it to a single page so the
+    request stays predictable.
+
+    The PDF is assembled under a hidden ``.part`` name and renamed into place
+    only when finished, so the SMB share (and the scan library) never shows a
+    0-byte or half-written file.
     """
     if not available():
         return False, "scanimage is not installed.", None
@@ -106,7 +131,10 @@ def scan_now(
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     tiff = settings.scan_dir / f".prntbtlr_{ts}.tiff"
+    part = settings.scan_dir / f".prntbtlr_{ts}.pdf.part"
     pdf = settings.scan_dir / f"scan_{ts}.pdf"
+
+    paper_name, dims = _paper_dims(paper or settings.scan_paper)
 
     cmd = [
         settings.scanimage,
@@ -118,6 +146,8 @@ def scan_now(
         mode,
         "--format=tiff",
     ]
+    if dims is not None:
+        cmd += ["-x", f"{dims[0]:g}", "-y", f"{dims[1]:g}"]
     if source:
         cmd += ["--source", source]
 
@@ -129,29 +159,46 @@ def scan_now(
         return False, proc.output or "Scan failed.", None
 
     if shell.which("img2pdf"):
-        conv = shell.run(["img2pdf", str(tiff), "-o", str(pdf)])
+        conv_cmd = ["img2pdf"]
+        if dims is not None:
+            # Pin the PDF page box to the exact standard size.
+            conv_cmd += ["--pagesize", paper_name]
+        conv = shell.run(conv_cmd + [str(tiff), "-o", str(part)])
     else:
-        conv = shell.run(["convert", str(tiff), str(pdf)])  # ImageMagick fallback
+        # ImageMagick fallback; the pdf: prefix names the format, which convert
+        # can't infer from the hidden .part filename.
+        conv = shell.run(["convert", str(tiff), f"pdf:{part}"])
 
     tiff.unlink(missing_ok=True)
     if not conv.ok:
+        part.unlink(missing_ok=True)
         return False, f"PDF conversion failed: {conv.output}", None
 
+    note = ""
+    searchable = False
     if ocr:
-        ok, note = _ocr_in_place(pdf)
-        if ok:
-            return True, f"Saved {pdf.name} (searchable)", pdf
+        # OCR runs on the hidden .part file, before the scan becomes visible.
+        searchable, note = _ocr_in_place(part)
+
+    part.replace(pdf)  # atomic: the finished PDF appears in one step
+
+    if searchable:
+        return True, f"Saved {pdf.name} (searchable)", pdf
+    if ocr:
         # OCR is best-effort: keep the plain scan, but tell the user it didn't run.
         return True, f"Saved {pdf.name} — OCR skipped: {note}", pdf
-
     return True, f"Saved {pdf.name}", pdf
 
 
 def _ocr_in_place(pdf: Path) -> tuple[bool, str]:
-    """Add a searchable text layer to *pdf* using ocrmypdf. Best-effort."""
+    """Add a searchable text layer to *pdf* using ocrmypdf. Best-effort.
+
+    The intermediate keeps *pdf*'s (possibly hidden ``.part``) name plus a
+    suffix, so it never surfaces as a visible ``scan_*.pdf`` in the share.
+    """
     if not ocr_available():
         return False, "ocrmypdf not installed"
-    out = pdf.with_suffix(".ocr.pdf")
+    out = pdf.with_name(pdf.name + ".ocr")
     res = shell.run(
         [
             "ocrmypdf",
@@ -204,6 +251,10 @@ def list_scans() -> list[ScanFile]:
         return []
     files: list[ScanFile] = []
     for entry in directory.iterdir():
+        # Dotfiles are in-progress intermediates (.prntbtlr_*.tiff/.pdf.part) —
+        # never list them.
+        if entry.name.startswith("."):
+            continue
         if entry.is_file() and entry.suffix.lower() == ".pdf":
             stat = entry.stat()
             files.append(
@@ -223,7 +274,7 @@ def resolve_scan(name: str) -> Path | None:
     base = settings.scan_dir.resolve()
     if base not in candidate.parents or not candidate.is_file():
         return None
-    if candidate.suffix.lower() != ".pdf":
+    if candidate.suffix.lower() != ".pdf" or candidate.name.startswith("."):
         return None
     return candidate
 
