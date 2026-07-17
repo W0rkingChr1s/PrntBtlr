@@ -17,6 +17,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   new `scripts/update.sh` (fetch release tarball → re-run the bundled
   installer) in a transient systemd unit so the panel restart can't kill the
   update. Container installs are detected and pointed at `docker pull` instead.
+- **Releases without a CLI**: a new **Cut release** workflow (Actions tab →
+  Run workflow) tags and publishes the next release entirely from the GitHub
+  website. It derives the version itself — continues an open beta series with
+  the next `-beta.N`, otherwise bumps the last release (minor/patch/major
+  selectable, explicit version optional) — then runs the Release workflow.
 - **Release automation for the two channels**: beta tags publish GitHub
   pre-releases with image tags `:x.y.z-beta.n` + `:beta`; stable tags publish
   full releases with `:x.y.z`, `:x.y`, `:stable` + `:latest`. A new **promote**

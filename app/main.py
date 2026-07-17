@@ -18,8 +18,7 @@ from .auth import auth_is_usable
 from .config import settings
 from .routes import auth as auth_routes
 from .routes import dashboard, printers, scans, system_routes
-from .services import updater
-from .services import system
+from .services import system, updater
 
 log = logging.getLogger("prntbtlr")
 logging.basicConfig(level=logging.DEBUG if settings.debug else logging.INFO)
