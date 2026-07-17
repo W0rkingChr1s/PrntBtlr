@@ -29,6 +29,29 @@ def test_pages_render(client, path):
     assert client.get(path).status_code == 200
 
 
+def test_printers_page_flags_same_device_duplicates(client, monkeypatch):
+    from app.routes import printers as printers_route
+    from app.services import cups
+
+    status = cups.CupsStatus(
+        available=True,
+        printers=[
+            cups.Printer(
+                "MX870", "idle", uri="usb://Canon/MX870%20series%20FAX?serial=10C5A0&interface=3"
+            ),
+            cups.Printer(
+                "MX870-series", "idle", uri="usb://Canon/MX870%20series?serial=10C5A0&interface=1"
+            ),
+        ],
+    )
+    monkeypatch.setattr(printers_route.cups, "status", lambda: status)
+
+    body = client.get("/printers").text
+    assert "same device" in body  # duplicate badge/note rendered
+    assert "fax" in body  # fax interface labelled
+    assert "10C5A0" in body  # shared serial surfaced
+
+
 def test_healthz_reports_health(client):
     body = client.get("/healthz").json()
     assert "health" in body

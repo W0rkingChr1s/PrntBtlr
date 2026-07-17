@@ -7,6 +7,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Same-device duplicate detection on the Printers page.** A multifunction USB
+  printer surfaces as several CUPS queues (e.g. its print and fax interfaces),
+  and CUPS' USB hotplug discovery can auto-create a queue right next to a manual
+  one — so the same physical printer shows up twice with no hint why. The panel
+  now parses `serial=`/`interface=` out of each device URI, groups queues by
+  serial, and marks any that share hardware with a **same device** badge and an
+  explanatory note; the fax endpoint additionally gets a **fax** label since it
+  can't print documents. Purely informational — nothing is auto-deleted, so the
+  user decides which queue to keep. New `Printer` properties `serial`,
+  `usb_interface`, `is_fax`, `device_params` and helper
+  `cups.duplicate_device_serials()`.
+
 - **Health checks + self-repair (the "control instances").** A new **Health**
   card on the System page continuously verifies the station is actually
   working: the box is on the network, every required service is running (and

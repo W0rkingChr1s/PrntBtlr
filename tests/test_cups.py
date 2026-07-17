@@ -75,6 +75,58 @@ def test_is_valid_printer_name():
         assert not cups.is_valid_printer_name(bad), repr(bad)
 
 
+def test_printer_parses_serial_and_interface():
+    p = cups.Printer(
+        name="MX870-series",
+        state="idle",
+        uri="usb://Canon/MX870%20series?serial=10C5A0&interface=1",
+    )
+    assert p.serial == "10C5A0"
+    assert p.usb_interface == "1"
+    assert p.is_fax is False
+
+
+def test_printer_detects_fax_interface():
+    p = cups.Printer(
+        name="MX870",
+        state="idle",
+        uri="usb://Canon/MX870%20series%20FAX?serial=10C5A0&interface=3",
+    )
+    assert p.serial == "10C5A0"
+    assert p.usb_interface == "3"
+    assert p.is_fax is True
+
+
+def test_printer_without_query_has_no_serial():
+    p = cups.Printer(name="net", state="idle", uri="ipp://printer.local/ipp/print")
+    assert p.serial == ""
+    assert p.usb_interface == ""
+    assert p.device_params == {}
+    assert p.is_fax is False
+
+
+def test_duplicate_device_serials_groups_by_serial():
+    printers = [
+        cups.Printer(
+            "MX870", "idle", uri="usb://Canon/MX870%20series%20FAX?serial=10C5A0&interface=3"
+        ),
+        cups.Printer(
+            "MX870-series", "idle", uri="usb://Canon/MX870%20series?serial=10C5A0&interface=1"
+        ),
+        cups.Printer("Office", "idle", uri="usb://HP/LaserJet?serial=ABC123"),
+    ]
+    # The two Canon queues share serial 10C5A0; the HP is alone.
+    assert cups.duplicate_device_serials(printers) == {"10C5A0"}
+
+
+def test_duplicate_device_serials_ignores_missing_serial():
+    printers = [
+        cups.Printer("a", "idle", uri="ipp://host/ipp/print"),
+        cups.Printer("b", "idle", uri="ipp://other/ipp/print"),
+    ]
+    assert cups.duplicate_device_serials(printers) == set()
+
+
 def test_status_reports_unavailable(monkeypatch):
     monkeypatch.setattr(cups.shell, "which", lambda b: None)
     st = cups.status()
