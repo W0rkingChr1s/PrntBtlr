@@ -19,6 +19,7 @@ from .config import settings
 from .routes import auth as auth_routes
 from .routes import dashboard, printers, scans, system_routes
 from .services import updater
+from .services import system
 
 log = logging.getLogger("prntbtlr")
 logging.basicConfig(level=logging.DEBUG if settings.debug else logging.INFO)
@@ -90,7 +91,29 @@ app.include_router(system_routes.router)
 
 @app.get("/healthz")
 def healthz():
-    return JSONResponse({"status": "ok", "app": settings.app_name, "version": __version__})
+    # Includes the systemd units from the dashboard so external monitoring
+    # (e.g. PRTG's REST Custom / HTTP Data Advanced sensors) can build one
+    # channel per service off this endpoint. ``value`` is 1 when the unit is
+    # active, 0 otherwise — keyed by unit name for stable JSONPath lookups.
+    svc = system.services()
+    return JSONResponse(
+        {
+            "status": "ok",
+            "app": settings.app_name,
+            "version": __version__,
+            "services": {
+                s.name: {
+                    "status": s.status,
+                    "active": s.active,
+                    "enabled": s.enabled,
+                    "value": 1 if s.active else 0,
+                }
+                for s in svc
+            },
+            "services_active": sum(1 for s in svc if s.active),
+            "services_total": len(svc),
+        }
+    )
 
 
 def run() -> None:

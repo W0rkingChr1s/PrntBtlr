@@ -34,6 +34,19 @@ def test_healthz_payload(client):
     assert body["app"] == "PrntBtlr"
 
 
+def test_healthz_reports_services(client):
+    from app.config import settings
+
+    body = client.get("/healthz").json()
+    assert set(body["services"]) == set(settings.services)
+    for state in body["services"].values():
+        assert state["value"] in (0, 1)
+        assert state["value"] == int(state["active"])
+        assert isinstance(state["status"], str)
+    assert body["services_total"] == len(settings.services)
+    assert 0 <= body["services_active"] <= body["services_total"]
+
+
 def test_unknown_scan_download_redirects(client):
     r = client.get("/scans/file/nope.pdf", follow_redirects=False)
     assert r.status_code == 303

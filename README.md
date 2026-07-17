@@ -206,6 +206,7 @@ Settings come from environment variables (prefix `PRNTBTLR_`) or
 |----------|---------|---------|
 | `PRNTBTLR_PORT` | `80` | Web panel port. |
 | `PRNTBTLR_SCAN_DIR` | `/srv/scans` | Where scans are saved & served from. |
+| `PRNTBTLR_SCAN_PAPER` | `A4` | Scan paper size: `A4`, `Letter`, `Legal`, or `Max` (full scanner bed). Applies to button scans and is the browser-scan default. |
 | `PRNTBTLR_DEBUG` | `false` | Verbose logging + autoreload. |
 | `PRNTBTLR_AUTH_ENABLED` | `false` | Require login to use the panel. |
 | `PRNTBTLR_AUTH_USERNAME` | `admin` | Login username. |

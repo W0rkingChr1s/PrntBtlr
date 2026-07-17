@@ -24,6 +24,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   **4** it automatically tags the latest beta as the stable release, and it can
   be dispatched manually (`force=true`) to cut a stable release earlier. A beta
   is excluded by putting `[failed]` in its release title/notes.
+- `/healthz` now reports the state of the monitored systemd services (the same
+  units shown on the dashboard: `cups`, `scanbd`, `prntbtlr-scan-listen`,
+  `smbd`, …) keyed by unit name, each with `status`, `active`, `enabled` and a
+  numeric `value` (1 = active, 0 = not), plus `services_active`/`services_total`
+  counters — so external monitoring such as PRTG (REST Custom / HTTP Data
+  Advanced sensor) can build one channel per service off a single endpoint.
 - **Reliable button scanning for Canon PIXMA via the USB interrupt endpoint.**
   Several PIXMA MFPs (e.g. the MX870) don't report their scan button through
   SANE's pollable `button-1`/`button-2` options, so `scanbd` never fires. A new
@@ -35,8 +41,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the listener and disables `scanbd` (they can't share the USB scanner).
 - `scan2pdf.sh` scan mode is now configurable via `PRNTBTLR_SCAN_MODE`
   (`Color`/`Gray`/`Lineart`).
+- **Paper size for scans** (`PRNTBTLR_SCAN_PAPER`, default `A4`; also a new
+  "Paper size" select on the Scans page): `A4`, `Letter`, `Legal`, or `Max`
+  (full scanner bed).
 
 ### Fixed
+- **Scanned pages were not A4.** Neither the button handler nor the browser scan
+  passed a scan window (`-x`/`-y`) to `scanimage`, so scanners scanned their
+  maximum area — 216 × 356 mm on a PIXMA ADF. Scans now default to A4 (210 × 297)
+  and the PDF page box is pinned to the exact standard size via
+  `img2pdf --pagesize`.
+- **The SMB share showed a 0-byte PDF while a scan was still being written.**
+  Button scans are now assembled (and OCR'd) entirely in a private temp dir and
+  published to `/srv/scans` with a copy-to-hidden-`.part`-then-rename, so the
+  visible `scan_*.pdf` appears complete in one atomic step. Browser scans build
+  under a hidden `.part` name and are renamed into place the same way; the scan
+  library and download endpoints ignore in-progress dotfiles.
 - **Scan button did nothing on Canon PIXMA (e.g. the MX870).** Pressing
   **SCAN → PC** left the device waiting ("Processing… / Verarbeitung…") while the
   Pi never picked up the scan. It turned out several PIXMAs don't expose the

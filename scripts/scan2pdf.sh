@@ -3,8 +3,13 @@
 #
 # Invoked by scanbd (or the PrntBtlr USB-interrupt listener, scan-listen.py) when
 # the hardware scan button is pressed. Tries the ADF first (multi-page), falls
-# back to the flatbed (single page), assembles a PDF and drops it into the shared
-# scan folder.
+# back to the flatbed (single page), assembles the PDF in a private temp dir and
+# only then moves it into the shared scan folder in a single atomic rename — the
+# SMB share never shows a 0-byte or half-written PDF.
+#
+# PRNTBTLR_SCAN_PAPER selects the page size: A4 (default), Letter, Legal, or Max
+# (full scanner bed). Without it scanners scan their maximum area (216x356 mm on
+# a PIXMA ADF), which is why scans used to come out oversized.
 #
 # Set PRNTBTLR_OCR=1 to produce a searchable PDF via ocrmypdf (used by the
 # scan2pdf-ocr.sh wrapper for a second scan button). PRNTBTLR_OCR_LANG selects
@@ -18,26 +23,50 @@ OUTDIR="${PRNTBTLR_SCAN_DIR:-/srv/scans}"
 TS=$(date +%Y%m%d_%H%M%S)
 DEV="${SCANBD_DEVICE:-pixma}"
 MODE="${PRNTBTLR_SCAN_MODE:-Color}"   # Color | Gray | Lineart
+PAPER="${PRNTBTLR_SCAN_PAPER:-A4}"    # A4 | Letter | Legal | Max (full bed)
 OCR="${PRNTBTLR_OCR:-0}"
 OCR_LANG="${PRNTBTLR_OCR_LANG:-eng}"
 TMP=$(mktemp -d) || exit 1
 cd "$TMP" || exit 1
 
-cleanup() { cd / && rm -rf "$TMP"; }
+# The PDF is assembled (and OCR'd) here in $TMP and only published to $OUTDIR
+# once complete; a hidden .part file bridges the copy so the final rename is
+# atomic within the share.
+OUT="$TMP/scan_$TS.pdf"
+FINAL="$OUTDIR/scan_$TS.pdf"
+PART="$OUTDIR/.scan_$TS.pdf.part"
+
+cleanup() { cd / && rm -rf "$TMP"; rm -f "$PART"; }
 trap cleanup EXIT
 
 mkdir -p "$OUTDIR"
 
 # Log that the button actually fired — makes "I pressed scan and nothing
 # happened" diagnosable (check: journalctl -t prntbtlr).
-logger -t prntbtlr "button scan fired (device=$DEV target=${SCANBD_TARGET:-?})"
+logger -t prntbtlr "button scan fired (device=$DEV target=${SCANBD_TARGET:-?} paper=$PAPER)"
 
-OUT="$OUTDIR/scan_$TS.pdf"
+# Constrain the scan window to the requested paper size; without -x/-y the
+# scanner uses its maximum area (216x356 mm on a PIXMA ADF, not A4). PAGESIZE
+# additionally pins the PDF page box to the exact standard size.
+case "$(printf '%s' "$PAPER" | tr '[:upper:]' '[:lower:]')" in
+  a4)     GEOM="-x 210 -y 297"       PAGESIZE="A4" ;;
+  letter) GEOM="-x 215.9 -y 279.4"   PAGESIZE="Letter" ;;
+  legal)  GEOM="-x 215.9 -y 355.6"   PAGESIZE="Legal" ;;
+  max|full|"") GEOM="" PAGESIZE="" ;;
+  *)
+    logger -t prntbtlr "unknown PRNTBTLR_SCAN_PAPER='$PAPER', using A4"
+    GEOM="-x 210 -y 297" PAGESIZE="A4"
+    ;;
+esac
 
 # Assemble the scanned TIFF(s) into a PDF; succeeds only with a non-empty PDF.
 build_pdf() {
   if command -v img2pdf >/dev/null 2>&1; then
-    img2pdf p_*.tiff -o "$OUT" 2>/dev/null
+    if [ -n "$PAGESIZE" ]; then
+      img2pdf --pagesize "$PAGESIZE" p_*.tiff -o "$OUT" 2>/dev/null
+    else
+      img2pdf p_*.tiff -o "$OUT" 2>/dev/null
+    fi
   else
     convert p_*.tiff "$OUT" 2>/dev/null   # ImageMagick fallback
   fi
@@ -56,11 +85,14 @@ while [ "$attempt" -lt 4 ]; do
   rm -f p_*.tiff
 
   # Prefer the document feeder (multi-page); fall back to the glass (single page).
+  # $GEOM is intentionally unquoted: it expands to "-x <mm> -y <mm>" (or nothing).
+  # shellcheck disable=SC2086
   if ! { scanimage -d "$DEV" --source "Automatic Document Feeder" \
-           --resolution 300 --mode "$MODE" --format=tiff \
+           --resolution 300 --mode "$MODE" $GEOM --format=tiff \
            --batch=p_%03d.tiff 2>/dev/null && ls p_*.tiff >/dev/null 2>&1; }; then
     rm -f p_*.tiff
-    scanimage -d "$DEV" --resolution 300 --mode "$MODE" --format=tiff \
+    # shellcheck disable=SC2086
+    scanimage -d "$DEV" --resolution 300 --mode "$MODE" $GEOM --format=tiff \
       > p_001.tiff 2>/dev/null
   fi
 
@@ -92,5 +124,12 @@ if [ "$OCR" = "1" ] && command -v ocrmypdf >/dev/null 2>&1; then
   fi
 fi
 
-chmod 664 "$OUT"
-logger -t prntbtlr "scan saved: $OUT"
+# Publish atomically: copy the finished PDF into the share as a hidden .part
+# file, then rename it into place — the visible scan_*.pdf appears complete in
+# one step instead of sitting at 0 KB while pages are still being written.
+if cp "$OUT" "$PART" && chmod 664 "$PART" && mv -f "$PART" "$FINAL"; then
+  logger -t prntbtlr "scan saved: $FINAL"
+else
+  logger -t prntbtlr "failed to publish scan to $FINAL"
+  exit 1
+fi
