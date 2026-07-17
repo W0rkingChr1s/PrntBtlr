@@ -22,10 +22,27 @@ def client():
         "/system",
         "/partials/services",
         "/partials/jobs",
+        "/system/health/partial",
     ],
 )
 def test_pages_render(client, path):
     assert client.get(path).status_code == 200
+
+
+def test_healthz_reports_health(client):
+    body = client.get("/healthz").json()
+    assert "health" in body
+    assert body["health"]["overall"] in ("ok", "warn", "fail")
+    assert isinstance(body["health"]["checks"], dict)
+    for check in body["health"]["checks"].values():
+        assert check["status"] in ("ok", "warn", "fail", "skip")
+        assert check["value"] in (0, 1)
+
+
+def test_self_repair_runs(client):
+    r = client.post("/system/health/repair", follow_redirects=False)
+    assert r.status_code == 303
+    assert "/system#health" in r.headers["location"]
 
 
 def test_healthz_payload(client):

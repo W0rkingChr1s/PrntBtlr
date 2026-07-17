@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Form, Request
 
 from ..config import settings
-from ..services import system, updater
+from ..services import health, repair, system, updater
 from ..templating import redirect, render
 
 router = APIRouter(prefix="/system")
@@ -21,7 +21,32 @@ def system_page(request: Request):
         host=system.host_info(),
         updates=updater.status(),
         update_repo=settings.update_repo,
+        health=health.run_checks(),
+        self_repair_enabled=settings.self_repair_enabled,
     )
+
+
+@router.get("/health/partial")
+def health_partial(request: Request):
+    """Polled fragment so the health card refreshes without a full reload."""
+    return render(request, "partials/health.html", health=health.run_checks())
+
+
+@router.post("/health/repair")
+def health_repair():
+    actions, after = repair.run()
+    if not actions:
+        return redirect("/system#health", "Nothing to repair — everything checks out.")
+    failed = [a for a in actions if not a.ok]
+    done = "; ".join(a.title for a in actions if a.ok)
+    if failed:
+        detail = "; ".join(f"{a.title}: {a.message}" for a in failed)
+        return redirect(
+            "/system#health",
+            f"Self-repair ran with problems ({detail}).",
+            "error" if after.overall == health.FAIL else "success",
+        )
+    return redirect("/system#health", f"Self-repair done: {done}.")
 
 
 @router.post("/services/{name}/restart")

@@ -179,7 +179,7 @@ the panel's scan form. To OCR button scans too, add `PRNTBTLR_OCR=1` to
 | **Dashboard** | Live status of printers, queue, services, storage and recent scans. |
 | **Printers** | Add/remove printers, test page, pause/resume, clear queue, error policy, AirPrint sharing. |
 | **Scans** | Scan on demand (source/mode/DPI), browse, view, download and delete saved PDFs. |
-| **System** | Service status + restart, host info, updates, links to CUPS admin. |
+| **System** | Health checks + one-click self-repair, service status + restart, host info, updates, links to CUPS admin. |
 
 <table>
 <tr>
@@ -300,8 +300,28 @@ Settings come from environment variables (prefix `PRNTBTLR_`) or
 | `PRNTBTLR_AUTH_USERNAME` | `admin` | Login username. |
 | `PRNTBTLR_AUTH_PASSWORD_HASH` | — | PBKDF2 hash (preferred over plaintext). |
 | `PRNTBTLR_SESSION_SECRET` | — | Key that signs the session cookie. |
+| `PRNTBTLR_SELF_REPAIR_ENABLED` | `false` | Repair common breakages automatically in the background (see below). |
+| `PRNTBTLR_SELF_REPAIR_INTERVAL` | `300` | Seconds between background self-repair sweeps. |
+| `PRNTBTLR_HEALTH_MIN_FREE_MB` | `200` | Warn below this much free space in the scan folder. |
 
 Restart after changes: `sudo systemctl restart prntbtlr`.
+
+### Health checks & self-repair
+
+The **System** page runs a set of *control instances* that confirm the station
+is actually working — network reachable, every required service up (and enabled
+on boot), CUPS alive, the printer connected **and** its queue ready, a scanner
+detected, AirPrint sharing on, and enough disk for scans. The card live-updates
+and each check reads `ok` / `warning` / `failed` / `n/a`.
+
+**Run self-repair** fixes the common breakages on the spot: it restarts and
+re-enables dead services, starts the scan-button handler, restarts CUPS, wakes a
+paused or stopped printer (and sets it to retry jobs — the classic stuck-queue
+cure), recreates the scan folder and re-enables sharing. It never touches the
+network configuration or deletes jobs/scans, so it's always safe to press. Set
+`PRNTBTLR_SELF_REPAIR_ENABLED=1` to have the panel apply those same repairs on
+its own every few minutes. The whole report is also in `/healthz` under a
+`health` object, so monitoring like PRTG can alert on it.
 
 ### Authentication (optional)
 

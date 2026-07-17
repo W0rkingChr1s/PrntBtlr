@@ -3,7 +3,30 @@
 {% block heading %}System{% endblock %}
 
 {% block content %}
-<div class="card">
+<div class="card" id="health">
+  <h2 class="spread">
+    <span>Health <span class="sub">— the control instances</span></span>
+    <form class="inline" method="post" action="/system/health/repair"
+          onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='Repairing…';">
+      <button class="btn sm" type="submit">🛠 Run self-repair</button>
+    </form>
+  </h2>
+  <div id="health-panel">{% include "partials/health.html" %}</div>
+  <div class="help gap">
+    Continuous checks that the box is actually working — network, services,
+    the connected printer and its queue, the scanner, AirPrint sharing and scan
+    storage. <strong>Run self-repair</strong> fixes what it safely can: restarts
+    dead services, wakes paused/stopped printers, restarts CUPS, recreates the
+    scan folder and re-enables sharing.
+    {% if self_repair_enabled %}
+    Background self-repair is <span class="badge ok plain">on</span> — the panel repairs these on its own.
+    {% else %}
+    Set <span class="mono">PRNTBTLR_SELF_REPAIR_ENABLED=1</span> to also repair automatically in the background.
+    {% endif %}
+  </div>
+</div>
+
+<div class="card gap">
   <h2>Services</h2>
   <table>
     <thead><tr><th>Service</th><th>Status</th><th>On boot</th><th></th></tr></thead>
@@ -101,4 +124,10 @@
   <div class="help gap">The native CUPS admin runs on port 631 and is handy for deep
     driver/PPD tweaks. PrntBtlr covers everyday tasks here.</div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  PrntBtlr.poll("/system/health/partial", "health-panel", 15000);
+</script>
 {% endblock %}

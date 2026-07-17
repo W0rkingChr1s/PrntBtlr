@@ -7,6 +7,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Health checks + self-repair (the "control instances").** A new **Health**
+  card on the System page continuously verifies the station is actually
+  working: the box is on the network, every required service is running (and
+  set to start on boot), CUPS is alive, the printer is connected *and* its
+  queue is ready, SANE sees a scanner, AirPrint sharing is on, and there's room
+  to save scans. The scan-button pair (`scanbd` / `prntbtlr-scan-listen`) is
+  checked as a group so the intentionally-idle handler isn't flagged. Each
+  verdict is `ok` / `warning` / `failed` / `n/a`, and the card live-polls.
+  **Run self-repair** fixes what it safely can — restart & re-enable dead
+  services, start the scan-button handler, restart CUPS, wake a paused/stopped
+  printer (and set it to retry jobs), recreate the scan folder, re-enable
+  sharing — while never touching the network config or deleting jobs/scans. Set
+  `PRNTBTLR_SELF_REPAIR_ENABLED=1` to also repair automatically in the
+  background (interval `PRNTBTLR_SELF_REPAIR_INTERVAL`, default 300 s). The
+  full report is added to `/healthz` under a `health` object (`overall` plus a
+  per-check `status`/`value`) so external monitoring can alert on it. New
+  settings: `PRNTBTLR_HEALTH_MIN_FREE_MB` (low-space threshold, default 200).
 - **Self-updater with release channels.** The panel now updates itself straight
   from GitHub Releases (the only distribution channel): a **stable** channel
   (`vX.Y.Z`) and a **beta** channel (`vX.Y.Z-beta.N`, GitHub pre-releases),
