@@ -7,6 +7,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `/healthz` now reports the state of the monitored systemd services (the same
+  units shown on the dashboard: `cups`, `scanbd`, `prntbtlr-scan-listen`,
+  `smbd`, …) keyed by unit name, each with `status`, `active`, `enabled` and a
+  numeric `value` (1 = active, 0 = not), plus `services_active`/`services_total`
+  counters — so external monitoring such as PRTG (REST Custom / HTTP Data
+  Advanced sensor) can build one channel per service off a single endpoint.
 - **Reliable button scanning for Canon PIXMA via the USB interrupt endpoint.**
   Several PIXMA MFPs (e.g. the MX870) don't report their scan button through
   SANE's pollable `button-1`/`button-2` options, so `scanbd` never fires. A new
