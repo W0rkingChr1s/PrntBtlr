@@ -155,10 +155,11 @@ restarts the panel — progress lands in `/var/log/prntbtlr-update.log`. Docker
 installs update by pulling the new image instead (`:latest`/`:stable` or
 `:beta`).
 
-For maintainers: betas ship as GitHub pre-releases, and **4 positive betas**
-since the last stable release are promoted to a stable release automatically —
-or earlier on demand. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the release
-flow.
+For maintainers: releases are cut entirely from the GitHub website — **Actions
+→ Cut release** picks the next version tag itself (no CLI needed). Betas ship
+as GitHub pre-releases, and **4 positive betas** since the last stable release
+are promoted to a stable release automatically — or earlier on demand. See
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the release flow.
 
 ---
 

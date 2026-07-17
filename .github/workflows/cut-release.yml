@@ -1,0 +1,117 @@
+name: Cut release
+
+# One-click releases from the GitHub website — no CLI needed:
+#
+#   Actions → "Cut release" → Run workflow → pick the channel → Run.
+#
+#   beta   → tags the next vX.Y.Z-beta.N on the default branch and publishes a
+#            GitHub pre-release (the 4th positive beta since the last stable
+#            release then auto-promotes to stable — see promote.yml).
+#   stable → tags vX.Y.Z directly. Normally promote.yml cuts stables from
+#            tested betas; use this for the very first release or emergencies.
+#
+# The version is worked out from existing tags: an open beta series (betas
+# without their stable release yet) is continued with the next -beta.N;
+# otherwise the last release is bumped (minor by default). Set the "version"
+# input to override, e.g. 0.3.0.
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Release channel"
+        type: choice
+        options: [beta, stable]
+        default: beta
+      bump:
+        description: "Bump when starting a new series (ignored while a beta series is open or when version is set)"
+        type: choice
+        options: [minor, patch, major]
+        default: minor
+      version:
+        description: "Base version X.Y.Z (optional override, e.g. 0.3.0)"
+        default: ""
+
+permissions:
+  contents: write   # push the new tag
+  actions: write    # run release.yml for it
+
+concurrency:
+  group: cut-release
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Work out the next version tag
+        id: next
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          BUMP: ${{ inputs.bump }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "$VERSION" ]; then
+            [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+              || { echo "::error::version must be X.Y.Z, got '$VERSION'"; exit 1; }
+            base="$VERSION"
+          else
+            # Open beta series = the highest beta base whose stable tag
+            # doesn't exist yet. Continue it if there is one.
+            base=""
+            for t in $(git tag --list 'v*-beta.*'); do
+              [[ "$t" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]] || continue
+              b="${t%-beta.*}"
+              git rev-parse -q --verify "refs/tags/$b" >/dev/null && continue
+              b="${b#v}"
+              if [ -z "$base" ] || [ "$(printf '%s\n%s\n' "$base" "$b" | sort -V | tail -1)" = "$b" ]; then
+                base="$b"
+              fi
+            done
+
+            if [ -z "$base" ]; then
+              # No open series — bump the latest stable release (0.0.0 if none).
+              latest_stable="$(git tag --list 'v*' \
+                | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)"
+              cur="${latest_stable#v}"; cur="${cur:-0.0.0}"
+              IFS=. read -r MA MI PA <<<"$cur"
+              case "$BUMP" in
+                major) base="$((MA + 1)).0.0" ;;
+                minor) base="$MA.$((MI + 1)).0" ;;
+                patch) base="$MA.$MI.$((PA + 1))" ;;
+              esac
+            fi
+          fi
+
+          if [ "$CHANNEL" = "beta" ]; then
+            n="$(git tag --list "v$base-beta.*" | sed 's/.*-beta\.//' \
+              | grep -E '^[0-9]+$' | sort -n | tail -1 || true)"
+            tag="v$base-beta.$(( ${n:-0} + 1 ))"
+          else
+            tag="v$base"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::$tag already exists"; exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Next $CHANNEL release: $tag"
+
+      - name: Tag and run the Release workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.next.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git tag "$TAG"
+          git push origin "refs/tags/$TAG"
+          # A tag pushed with GITHUB_TOKEN doesn't fire release.yml's tag
+          # trigger, so run the workflow for the new tag explicitly.
+          gh workflow run release.yml -R "$GITHUB_REPOSITORY" --ref "refs/tags/$TAG"
+          echo "::notice::Tagged $TAG and dispatched the Release workflow."

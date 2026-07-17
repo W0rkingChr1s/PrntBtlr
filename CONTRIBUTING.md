@@ -69,13 +69,19 @@ channels:
 
 ### Beta releases
 
-Cut one whenever there is something to test:
+Cut one whenever there is something to test — **no CLI needed**: go to
+**Actions → Cut release → Run workflow**, keep channel `beta`, and run it. The
+workflow works out the next tag by itself (continues an open beta series with
+`-beta.N+1`, otherwise bumps the last release — minor by default — or takes an
+explicit `version` input) and kicks off the Release workflow.
+
+Tagging by hand still works too:
 
 ```bash
 git tag v0.2.0-beta.1 && git push origin v0.2.0-beta.1
 ```
 
-The **Release** workflow marks it as a GitHub *pre-release* and pushes the
+Either way, the **Release** workflow marks it as a GitHub *pre-release* and pushes the
 image as `:0.2.0-beta.1` + `:beta`. Panels on the **beta channel** pick it up;
 the stable channel never sees it. CHANGELOG notes may stay under
 `## [Unreleased]` until the stable release (the workflow falls back to the base
@@ -93,8 +99,11 @@ as `vX.Y.Z` (the beta version without its `-beta.N` suffix) and re-runs the
 Release workflow for it — full GitHub release, image tags `:x.y.z`, `:x.y`,
 `:stable` and `:latest`.
 
-To cut a stable release **earlier**, either run the *Promote beta to stable*
-workflow manually with **force** ticked (Actions tab), or tag by hand:
+To cut a stable release **earlier**, run the *Promote beta to stable* workflow
+manually with **force** ticked (Actions tab) — it promotes the latest tested
+beta. For a stable release straight from `main` without any beta (first
+release, emergencies), use **Actions → Cut release** with channel `stable`.
+Tagging by hand also still works:
 
 ```bash
 git tag v0.2.0 && git push origin v0.2.0
