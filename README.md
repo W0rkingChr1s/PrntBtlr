@@ -276,8 +276,9 @@ never stored. To generate a hash yourself:
 ```
 
 PrntBtlr drives the standard tools via their CLIs (`lpadmin`, `lpstat`,
-`scanimage`, `systemctl`) — nothing proprietary, no daemon of its own beyond the
-web app.
+`scanimage`, `systemctl`) — nothing proprietary. Its own footprint is the web
+app plus, on Canon PIXMA hardware, the small `prntbtlr-scan-listen` USB-button
+listener described above (`scanbd` handles the button on everything else).
 
 ---
 
