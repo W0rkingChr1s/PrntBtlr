@@ -1,0 +1,28 @@
+{# Health report — the control instances. Polled into #health-panel. #}
+<div class="spread health-head">
+  <span>
+    {% if health.overall == 'ok' %}<span class="badge ok">all systems go</span>
+    {% elif health.overall == 'warn' %}<span class="badge warn">needs attention</span>
+    {% else %}<span class="badge bad">problems found</span>{% endif %}
+    <span class="muted">{{ health.summary }}</span>
+  </span>
+</div>
+<table>
+  <tbody>
+  {% for c in health.checks %}
+    <tr>
+      <td>
+        <strong>{{ c.title }}</strong>
+        {% if c.repairable %}<span class="badge idle plain" title="Self-repair can fix this">repairable</span>{% endif %}
+        <div class="muted">{{ c.detail }}</div>
+      </td>
+      <td style="text-align:right">
+        {% if c.status == 'ok' %}<span class="badge ok">ok</span>
+        {% elif c.status == 'warn' %}<span class="badge warn">warning</span>
+        {% elif c.status == 'fail' %}<span class="badge bad">failed</span>
+        {% else %}<span class="badge plain">n/a</span>{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>

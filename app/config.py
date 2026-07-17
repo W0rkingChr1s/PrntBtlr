@@ -91,6 +91,20 @@ class Settings(BaseSettings):
     # Scanning can take a while (warm-up + ADF); give it room.
     scan_timeout: int = 300
 
+    # --- Health checks & self-repair --------------------------------------
+    # The "control instances": the panel continuously verifies that the box is
+    # actually working (network up, services running, printer connected & set
+    # up, storage free) and can repair the common breakages on its own.
+    #
+    # Warn below this much free space in the scan folder (MB).
+    health_min_free_mb: int = 200
+    # Run the self-repair automatically in the background (restart dead
+    # services, wake stopped printers, ...). Off by default — the "Run
+    # self-repair" button on the System page always works regardless.
+    self_repair_enabled: bool = False
+    # Seconds between background self-repair sweeps (only when enabled above).
+    self_repair_interval: int = 300
+
     # --- Updates ------------------------------------------------------------
     # The panel updates itself from this repo's GitHub Releases. Two channels:
     # "stable" (default) sees full releases only, "beta" also sees

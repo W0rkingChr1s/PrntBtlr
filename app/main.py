@@ -18,7 +18,7 @@ from .auth import auth_is_usable
 from .config import settings
 from .routes import auth as auth_routes
 from .routes import dashboard, printers, scans, system_routes
-from .services import system, updater
+from .services import health, repair, system, updater
 
 log = logging.getLogger("prntbtlr")
 logging.basicConfig(level=logging.DEBUG if settings.debug else logging.INFO)
@@ -26,13 +26,20 @@ logging.basicConfig(level=logging.DEBUG if settings.debug else logging.INFO)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Background update checker (channel + auto/notify are set on the System
-    # page); PRNTBTLR_UPDATE_CHECK_INTERVAL=0 disables it.
-    task = None
+    # Long-running background workers, cancelled cleanly on shutdown.
+    tasks: list[asyncio.Task] = []
+    # Update checker (channel + auto/notify are set on the System page);
+    # PRNTBTLR_UPDATE_CHECK_INTERVAL=0 disables it.
     if settings.update_check_interval > 0:
-        task = asyncio.create_task(updater.background_loop())
+        tasks.append(asyncio.create_task(updater.background_loop()))
+    # Optional autonomous self-repair (PRNTBTLR_SELF_REPAIR_ENABLED=1).
+    if settings.self_repair_enabled:
+        log.info(
+            "self-repair: background sweeps enabled (every %ss)", settings.self_repair_interval
+        )
+        tasks.append(asyncio.create_task(repair.background_loop()))
     yield
-    if task:
+    for task in tasks:
         task.cancel()
         with suppress(asyncio.CancelledError):
             await task
@@ -95,6 +102,7 @@ def healthz():
     # channel per service off this endpoint. ``value`` is 1 when the unit is
     # active, 0 otherwise — keyed by unit name for stable JSONPath lookups.
     svc = system.services()
+    report = health.run_checks()
     return JSONResponse(
         {
             "status": "ok",
@@ -111,6 +119,25 @@ def healthz():
             },
             "services_active": sum(1 for s in svc if s.active),
             "services_total": len(svc),
+            # The control-instance verdicts. ``value`` is 1 for a healthy check
+            # (ok/skip), 0 otherwise, so monitoring can alert per check.
+            "health": {
+                "overall": report.overall,
+                "ok": report.count(health.OK),
+                "warn": report.count(health.WARN),
+                "fail": report.count(health.FAIL),
+                "repairable": len(report.repairable),
+                "checks": {
+                    c.key: {
+                        "title": c.title,
+                        "status": c.status,
+                        "detail": c.detail,
+                        "repairable": c.repairable,
+                        "value": 0 if c.status in (health.WARN, health.FAIL) else 1,
+                    }
+                    for c in report.checks
+                },
+            },
         }
     )
 

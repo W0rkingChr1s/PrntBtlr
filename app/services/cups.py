@@ -93,6 +93,30 @@ def available() -> bool:
     return shell.which(settings.cups_lpstat) is not None
 
 
+def scheduler_running() -> bool:
+    """True when the CUPS scheduler answers (``lpstat -r``).
+
+    ``lpstat`` being installed doesn't mean ``cupsd`` is up — a stopped daemon
+    still prints "scheduler is not running". Used by the health checks to tell a
+    dead print system apart from a merely idle one.
+    """
+    res = shell.run([settings.cups_lpstat, "-r"])
+    return res.ok and "not running" not in res.stdout.lower()
+
+
+def sharing_enabled() -> bool | None:
+    """Whether AirPrint/IPP sharing (``--share-printers``) is on.
+
+    Returns ``None`` when it can't be determined (cupsctl missing/erroring) so
+    callers can skip the check instead of reporting a false problem.
+    """
+    res = shell.run([settings.cups_cupsctl])
+    if not res.ok:
+        return None
+    m = re.search(r"_share_printers=(\d)", res.stdout)
+    return m.group(1) == "1" if m else None
+
+
 def _default_printer() -> str:
     res = shell.run([settings.cups_lpstat, "-d"])
     if not res.ok:

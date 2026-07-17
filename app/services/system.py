@@ -64,6 +64,13 @@ def restart_service(name: str) -> shell.Result:
     return _systemctl("restart", name)
 
 
+def enable_service(name: str) -> shell.Result:
+    """Enable *name* on boot (used by self-repair to make a fix stick)."""
+    if name not in settings.services:
+        return shell.Result(False, 1, "", f"unknown service: {name}")
+    return _systemctl("enable", name)
+
+
 def _primary_ip() -> str:
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
