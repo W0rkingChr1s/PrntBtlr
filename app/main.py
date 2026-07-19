@@ -108,6 +108,12 @@ def _prtg_payload(svc, report: health.HealthReport) -> dict:
     matching limits, so a warning check goes yellow and a failed one goes red.
     """
     active = sum(1 for s in svc if s.active)
+    # The scan-button pair (scanbd / prntbtlr-scan-listen) shares one USB
+    # scanner, so exactly one of them runs and the other is idle by design.
+    # A healthy host therefore never has *all* units active — expect one fewer
+    # per extra scan-button unit so this channel doesn't cry wolf on every box.
+    scan_button_units = sum(1 for s in svc if s.name in health.SCAN_BUTTON_SERVICES)
+    expected_active = len(svc) - max(0, scan_button_units - 1)
     # ok/skip -> 2 (green), warn -> 1 (yellow), fail -> 0 (red).
     scale = {health.OK: 2, health.SKIP: 2, health.WARN: 1, health.FAIL: 0}
     results = [
@@ -124,7 +130,7 @@ def _prtg_payload(svc, report: health.HealthReport) -> dict:
             "channel": "Services active",
             "value": active,
             "limitmode": 1,
-            "limitminerror": len(svc) - 0.5,
+            "limitminerror": expected_active - 0.5,
             "limiterrormsg": "A required service is not running",
         },
         {

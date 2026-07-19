@@ -105,6 +105,36 @@ def test_healthz_rejects_unknown_format(client):
     assert client.get("/healthz?format=xml").status_code == 422
 
 
+def test_prtg_services_active_allows_idle_scan_button():
+    # The scan-button pair shares one USB scanner, so one unit is idle by
+    # design. A fully healthy host has 4/5 active, and the "Services active"
+    # channel must not flag that as an error (regression: it used to require
+    # all units up and went red on every install).
+    from app.main import _prtg_payload
+    from app.services import health, system
+
+    svc = [
+        system.ServiceState("cups", True, True, "active"),
+        system.ServiceState("scanbd", False, False, "inactive"),
+        system.ServiceState("prntbtlr-scan-listen", True, True, "active"),
+        system.ServiceState("smbd", True, True, "active"),
+        system.ServiceState("avahi-daemon", True, True, "active"),
+    ]
+    report = health.HealthReport([health.Check("scanbutton", "Scan button", health.OK)])
+    ch = next(
+        r for r in _prtg_payload(svc, report)["prtg"]["result"] if r["channel"] == "Services active"
+    )
+    assert ch["value"] == 4
+    assert ch["value"] >= ch["limitminerror"]  # green, not a false error
+
+    # A genuinely-down required service still trips the error limit.
+    svc[0] = system.ServiceState("cups", False, False, "inactive")
+    ch = next(
+        r for r in _prtg_payload(svc, report)["prtg"]["result"] if r["channel"] == "Services active"
+    )
+    assert ch["value"] < ch["limitminerror"]
+
+
 def test_unknown_scan_download_redirects(client):
     r = client.get("/scans/file/nope.pdf", follow_redirects=False)
     assert r.status_code == 303
