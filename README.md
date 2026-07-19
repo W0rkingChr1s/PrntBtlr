@@ -321,7 +321,9 @@ cure), recreates the scan folder and re-enables sharing. It never touches the
 network configuration or deletes jobs/scans, so it's always safe to press. Set
 `PRNTBTLR_SELF_REPAIR_ENABLED=1` to have the panel apply those same repairs on
 its own every few minutes. The whole report is also in `/healthz` under a
-`health` object, so monitoring like PRTG can alert on it.
+`health` object, so monitoring like PRTG can alert on it. For a ready-made PRTG
+setup (and other tools), see **[docs/monitoring.md](docs/monitoring.md)** —
+`/healthz?format=prtg` returns PRTG's native HTTP Data Advanced JSON directly.
 
 ### Authentication (optional)
 

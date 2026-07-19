@@ -8,7 +8,7 @@ import secrets
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -95,14 +95,77 @@ app.include_router(scans.router)
 app.include_router(system_routes.router)
 
 
+def _prtg_payload(svc, report: health.HealthReport) -> dict:
+    """Render the health report in PRTG's native "HTTP Data Advanced" shape.
+
+    PRTG's HTTP Data Advanced sensor only accepts a ``{"prtg": {"result": []}}``
+    document — it rejects any other JSON with error PE231. So instead of asking
+    the sensor to walk our own layout with JSONPath, we emit the channels it
+    expects directly. Each channel carries its own limits, so the sensor turns
+    a check red/yellow on its own without any per-channel setup in PRTG.
+
+    Values use a 2/1/0 scale (ok/skip = 2, warn = 1, fail = 0) with the
+    matching limits, so a warning check goes yellow and a failed one goes red.
+    """
+    active = sum(1 for s in svc if s.active)
+    # ok/skip -> 2 (green), warn -> 1 (yellow), fail -> 0 (red).
+    scale = {health.OK: 2, health.SKIP: 2, health.WARN: 1, health.FAIL: 0}
+    results = [
+        {
+            "channel": "Overall health",
+            "value": scale[report.overall],
+            "limitmode": 1,
+            "limitminwarning": 1.5,
+            "limitminerror": 0.5,
+            "limitwarningmsg": "One or more control instances need attention",
+            "limiterrormsg": "One or more control instances failed",
+        },
+        {
+            "channel": "Services active",
+            "value": active,
+            "limitmode": 1,
+            "limitminerror": len(svc) - 0.5,
+            "limiterrormsg": "A required service is not running",
+        },
+        {
+            "channel": "Checks failing",
+            "value": report.count(health.FAIL),
+            "limitmode": 1,
+            "limitmaxerror": 0.5,
+        },
+        {
+            "channel": "Checks warning",
+            "value": report.count(health.WARN),
+            "limitmode": 1,
+            "limitmaxwarning": 0.5,
+        },
+    ]
+    # One channel per control instance. Reusing the report (not the raw service
+    # list) means the scan-button pair and any skipped checks are already
+    # resolved, so an intentionally-idle handler never shows as an error.
+    for c in report.checks:
+        results.append(
+            {
+                "channel": c.title,
+                "value": scale[c.status],
+                "limitmode": 1,
+                "limitminwarning": 1.5,
+                "limitminerror": 0.5,
+            }
+        )
+    return {"prtg": {"result": results, "text": f"{settings.app_name}: {report.summary}"}}
+
+
 @app.get("/healthz")
-def healthz():
-    # Includes the systemd units from the dashboard so external monitoring
-    # (e.g. PRTG's REST Custom / HTTP Data Advanced sensors) can build one
-    # channel per service off this endpoint. ``value`` is 1 when the unit is
-    # active, 0 otherwise — keyed by unit name for stable JSONPath lookups.
+def healthz(format: str = Query("json", pattern="^(json|prtg)$")):
+    # Includes the systemd units from the dashboard so external monitoring can
+    # build one channel per service off this endpoint. ``value`` is 1 when the
+    # unit is active, 0 otherwise — keyed by unit name for stable JSONPath
+    # lookups. Add ``?format=prtg`` for PRTG's native HTTP Data Advanced shape.
     svc = system.services()
     report = health.run_checks()
+    if format == "prtg":
+        return JSONResponse(_prtg_payload(svc, report))
     return JSONResponse(
         {
             "status": "ok",

@@ -87,6 +87,24 @@ def test_healthz_reports_services(client):
     assert 0 <= body["services_active"] <= body["services_total"]
 
 
+def test_healthz_prtg_format(client):
+    # PRTG's HTTP Data Advanced sensor rejects anything but this shape (PE231).
+    body = client.get("/healthz?format=prtg").json()
+    assert "prtg" in body
+    results = body["prtg"]["result"]
+    assert isinstance(results, list) and results
+    channels = {r["channel"] for r in results}
+    assert {"Overall health", "Services active"} <= channels
+    for r in results:
+        assert isinstance(r["channel"], str)
+        assert r["value"] in (0, 1, 2) or isinstance(r["value"], int)
+        assert r["limitmode"] == 1
+
+
+def test_healthz_rejects_unknown_format(client):
+    assert client.get("/healthz?format=xml").status_code == 422
+
+
 def test_unknown_scan_download_redirects(client):
     r = client.get("/scans/file/nope.pdf", follow_redirects=False)
     assert r.status_code == 303
