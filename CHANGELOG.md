@@ -7,6 +7,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Native PRTG output on `/healthz` + monitoring docs.** PRTG's *HTTP Data
+  Advanced* sensor only accepts JSON in its own `{"prtg": {"result": […]}}`
+  shape and rejects the plain payload with error PE231. `/healthz?format=prtg`
+  now emits exactly that shape — one channel per service and per control
+  instance, each with limits baked in (2/1/0 = green/yellow/red), plus summary
+  channels (`Overall health`, `Services active`, `Checks failing/warning`) — so
+  the sensor works with no per-channel setup. The default `/healthz` JSON is
+  unchanged. New guide at `docs/monitoring.md` covers the PRTG setup (native and
+  REST-Custom/JSONPath) and other tools.
+
 - **Same-device duplicate detection on the Printers page.** A multifunction USB
   printer surfaces as several CUPS queues (e.g. its print and fax interfaces),
   and CUPS' USB hotplug discovery can auto-create a queue right next to a manual
