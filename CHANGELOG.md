@@ -6,6 +6,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **PRTG `Services active` channel no longer false-alarms.** The scan-button
+  pair (`scanbd` / `prntbtlr-scan-listen`) shares one USB scanner, so exactly
+  one runs and the other is idle by design — a healthy host has 4/5 units
+  active, never 5. The channel's error limit required *all* units up, turning it
+  red on every install while `Overall health` stayed green. The limit now
+  expects one idle scan-button unit, so a genuinely-down service still trips it
+  but the intentional idle one doesn't.
+
 ### Added
 - **Native PRTG output on `/healthz` + monitoring docs.** PRTG's *HTTP Data
   Advanced* sensor only accepts JSON in its own `{"prtg": {"result": […]}}`

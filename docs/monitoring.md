@@ -80,7 +80,7 @@ configured channel-by-channel in PRTG:
         "limitwarningmsg": "One or more control instances need attention",
         "limiterrormsg": "One or more control instances failed" },
       { "channel": "Services active",  "value": 4, "limitmode": 1,
-        "limitminerror": 4.5, "limiterrormsg": "A required service is not running" },
+        "limitminerror": 3.5, "limiterrormsg": "A required service is not running" },
       { "channel": "Checks failing",   "value": 0, "limitmode": 1, "limitmaxerror": 0.5 },
       { "channel": "Checks warning",   "value": 1, "limitmode": 1, "limitmaxwarning": 0.5 },
       { "channel": "Network connection", "value": 2, "limitmode": 1,
@@ -103,8 +103,10 @@ configured channel-by-channel in PRTG:
 | `0`   | `fail`         | red (down)    |
 
 The `Services active` channel counts running units and goes **red** as soon as
-one is down (`limitminerror` = total − 0.5). The summary `text` is shown on the
-sensor.
+a required one is down. The scan-button pair (`scanbd` / `prntbtlr-scan-listen`)
+shares one USB scanner, so exactly one runs and the other is idle by design —
+the error limit accounts for that (one fewer than the total), so a healthy PIXMA
+host showing `4` of `5` stays green. The summary `text` is shown on the sensor.
 
 ### Adding the sensor
 
