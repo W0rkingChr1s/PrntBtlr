@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Form, Request
 
 from ..config import settings
-from ..services import health, repair, system, updater
+from ..services import features, health, repair, system, updater
 from ..templating import redirect, render
 
 router = APIRouter(prefix="/system")
@@ -23,7 +23,23 @@ def system_page(request: Request):
         update_repo=settings.update_repo,
         health=health.run_checks(),
         self_repair_enabled=settings.self_repair_enabled,
+        feature_list=features.all_features(),
     )
+
+
+@router.post("/features")
+async def save_features(request: Request):
+    """Persist the on/off state of the top-level functions.
+
+    Each feature renders as a checkbox named after its key; an unchecked box
+    simply doesn't submit, so the selected set is exactly the checked ones.
+    """
+    form = await request.form()
+    selected = {f.key for f in features.FEATURES if form.get(f.key)}
+    features.save(selected)
+    off = [f.label for f in features.all_features() if not f.enabled]
+    detail = "all functions on" if not off else f"off: {', '.join(off)}"
+    return redirect("/system#features", f"Functions updated — {detail}.")
 
 
 @router.get("/health/partial")
@@ -56,8 +72,17 @@ def restart(name: str):
     return redirect("/system", msg, "success" if res.ok else "error")
 
 
+def _updates_off_redirect():
+    """Block the update actions while the self-update function is switched off."""
+    if not features.is_enabled("updates"):
+        return redirect("/system#features", "Self-updates are switched off.", "info")
+    return None
+
+
 @router.post("/updates/settings")
 def update_settings(beta: str = Form(""), auto: str = Form("")):
+    if (blocked := _updates_off_redirect()) is not None:
+        return blocked
     channel = "beta" if beta else "stable"
     try:
         updater.save_prefs(channel=channel, auto_update=bool(auto))
@@ -69,6 +94,8 @@ def update_settings(beta: str = Form(""), auto: str = Form("")):
 
 @router.post("/updates/check")
 def update_check():
+    if (blocked := _updates_off_redirect()) is not None:
+        return blocked
     st = updater.check_for_update()
     if st.last_error:
         return redirect("/system", f"Update check failed: {st.last_error}", "error")
@@ -79,6 +106,8 @@ def update_check():
 
 @router.post("/updates/apply")
 def update_apply(tag: str = Form(...)):
+    if (blocked := _updates_off_redirect()) is not None:
+        return blocked
     st = updater.status()
     if not st.available or st.available.get("tag") != tag:
         return redirect("/system", "That update is no longer available — check again.", "error")

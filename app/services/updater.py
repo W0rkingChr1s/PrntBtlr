@@ -249,6 +249,13 @@ async def background_loop() -> None:
     await asyncio.sleep(_STARTUP_DELAY)
     while True:
         try:
+            # Skip the whole cycle while the self-update function is switched off
+            # on the System page (avoids needless GitHub traffic).
+            from . import features
+
+            if not features.is_enabled("updates"):
+                await asyncio.sleep(settings.update_check_interval)
+                continue
             st = await asyncio.to_thread(check_for_update)
             if st.available and _is_newer(st.available.get("tag") or ""):
                 if st.auto_update and can_apply():

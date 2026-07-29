@@ -20,10 +20,14 @@
       <nav>
         <a href="/" class="{{ 'active' if nav_active == 'dashboard' }}">
           <span class="ico">▦</span> Dashboard</a>
+        {% if features.printers %}
         <a href="/printers" class="{{ 'active' if nav_active == 'printers' }}">
           <span class="ico">🖨</span> Printers</a>
+        {% endif %}
+        {% if features.scans %}
         <a href="/scans" class="{{ 'active' if nav_active == 'scans' }}">
           <span class="ico">📄</span> Scans</a>
+        {% endif %}
         <a href="/system" class="{{ 'active' if nav_active == 'system' }}">
           <span class="ico">⚙</span> System</a>
       </nav>

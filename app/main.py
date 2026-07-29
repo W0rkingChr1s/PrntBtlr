@@ -18,7 +18,8 @@ from .auth import auth_is_usable
 from .config import settings
 from .routes import auth as auth_routes
 from .routes import dashboard, printers, scans, system_routes
-from .services import health, repair, system, updater
+from .services import features, health, repair, system, updater
+from .templating import redirect
 
 log = logging.getLogger("prntbtlr")
 logging.basicConfig(level=logging.DEBUG if settings.debug else logging.INFO)
@@ -49,6 +50,26 @@ app = FastAPI(title=settings.app_name, version=__version__, lifespan=lifespan)
 
 # Paths reachable without a session even when auth is on.
 _PUBLIC_PREFIXES = ("/login", "/logout", "/static", "/healthz", "/favicon")
+
+# Route prefixes gated by a feature toggle: a switched-off function 303s back to
+# the dashboard instead of serving its pages. Added FIRST so it ends up
+# innermost — when auth is on, require_login still runs before it, so an
+# unauthenticated visitor lands on the login page rather than a redirect loop.
+_FEATURE_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("/printers", "printers"),
+    ("/scans", "scans"),
+)
+
+
+@app.middleware("http")
+async def feature_gate(request: Request, call_next):
+    path = request.url.path
+    for prefix, key in _FEATURE_PREFIXES:
+        if path.startswith(prefix) and not features.is_enabled(key):
+            name = next((f.label for f in features.FEATURES if f.key == key), key)
+            return redirect("/", f"{name} is switched off. Enable it on the System page.", "info")
+    return await call_next(request)
+
 
 if settings.auth_enabled:
     if not auth_is_usable():

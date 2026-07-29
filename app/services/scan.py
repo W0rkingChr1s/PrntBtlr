@@ -8,8 +8,9 @@ browser, and browsing/serving the resulting PDFs.
 
 from __future__ import annotations
 
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -29,6 +30,30 @@ PAPER_SIZES: dict[str, tuple[float, float]] = {
 }
 PAPER_CHOICES: tuple[str, ...] = ("A4", "Letter", "Legal", "Max")
 
+# Fallback scan options used until the scanner has been initialized (or when the
+# probe turns up nothing). These match what the Scans form has always offered.
+DEFAULT_MODES: tuple[str, ...] = ("Color", "Gray", "Lineart")
+DEFAULT_SOURCES: tuple[str, ...] = ("Flatbed", "Automatic Document Feeder")
+DEFAULT_RESOLUTIONS: tuple[int, ...] = (150, 300, 600)
+
+# Friendly labels for the SANE mode/source names; anything unmapped is shown
+# verbatim (a detected scanner may expose names we don't know about).
+MODE_LABELS: dict[str, str] = {
+    "Color": "Color",
+    "Gray": "Grayscale",
+    "Lineart": "Black & white",
+}
+SOURCE_LABELS: dict[str, str] = {
+    "Flatbed": "Flatbed (glass)",
+    "Automatic Document Feeder": "Document feeder (ADF)",
+    "Automatic Document Feeder (Duplex)": "Document feeder — duplex",
+    "ADF": "Document feeder (ADF)",
+    "ADF Duplex": "Document feeder — duplex",
+}
+
+# One option line from ``scanimage -A``: ``    --mode Color|Gray|Lineart [Color]``
+_OPT_RE = re.compile(r"^\s*(--[a-z0-9-]+)\s+(.*)$", re.IGNORECASE)
+
 
 def _paper_dims(paper: str) -> tuple[str, tuple[float, float] | None]:
     """Normalize a paper name; returns ``(canonical_name, (w_mm, h_mm) | None)``."""
@@ -42,6 +67,34 @@ def _paper_dims(paper: str) -> tuple[str, tuple[float, float] | None]:
 class ScanDevice:
     device: str
     description: str = ""
+
+
+@dataclass
+class ScanCapabilities:
+    """What a scanner actually supports, as detected by the init step.
+
+    ``resolutions`` is the discrete list a scanner offers; scanners that report a
+    continuous range instead fill ``resolution_range`` (min, max) and we derive a
+    sensible pick list from it. Either way :meth:`resolution_choices` yields the
+    values to show in the form.
+    """
+
+    device: str
+    modes: list[str] = field(default_factory=list)
+    sources: list[str] = field(default_factory=list)
+    resolutions: list[int] = field(default_factory=list)
+    resolution_range: tuple[int, int] | None = None
+    detected_at: str = ""
+
+    def resolution_choices(self) -> list[int]:
+        if self.resolutions:
+            return self.resolutions
+        if self.resolution_range:
+            lo, hi = self.resolution_range
+            # Offer the common steps that fall inside the supported range.
+            picks = [r for r in (75, 150, 300, 600, 1200) if lo <= r <= hi]
+            return picks or [lo, hi]
+        return list(DEFAULT_RESOLUTIONS)
 
 
 @dataclass
@@ -96,6 +149,122 @@ def list_devices() -> list[ScanDevice]:
 def first_device() -> str:
     devices = list_devices()
     return devices[0].device if devices else settings.default_scan_device
+
+
+# --------------------------------------------------------------------------- #
+# Scanner initialization (capability probe)
+# --------------------------------------------------------------------------- #
+def _enum_values(spec: str) -> list[str]:
+    """Pipe-separated option values, minus the trailing ``[default]`` marker."""
+    spec = re.sub(r"\[.*?\]\s*$", "", spec).strip()
+    return [v.strip() for v in spec.split("|") if v.strip()]
+
+
+def _parse_resolution(spec: str) -> tuple[list[int], tuple[int, int] | None]:
+    """Return ``(discrete_values, range)`` from a ``--resolution`` constraint.
+
+    Handles both a discrete list (``75|150|300dpi``) and a continuous range
+    (``75..1200dpi (in steps of 1)``).
+    """
+    if ".." in spec:
+        m = re.search(r"(\d+(?:\.\d+)?)\s*\.\.\s*(\d+(?:\.\d+)?)", spec)
+        if m:
+            return [], (int(float(m.group(1))), int(float(m.group(2))))
+        return [], None
+    spec = re.sub(r"\[.*?\]\s*$", "", spec)  # drop the [default] before scanning
+    values = [int(float(x)) for x in re.findall(r"\d+(?:\.\d+)?", spec)]
+    return values, None
+
+
+def parse_capabilities(device: str, output: str) -> ScanCapabilities:
+    """Parse ``scanimage -A`` output into a :class:`ScanCapabilities`."""
+    caps = ScanCapabilities(device=device, detected_at=datetime.now().strftime("%Y-%m-%d %H:%M"))
+    for line in output.splitlines():
+        m = _OPT_RE.match(line)
+        if not m:
+            continue
+        name, spec = m.group(1).lower(), m.group(2).strip()
+        if name == "--mode":
+            caps.modes = _enum_values(spec)
+        elif name == "--source":
+            caps.sources = _enum_values(spec)
+        elif name == "--resolution":
+            caps.resolutions, caps.resolution_range = _parse_resolution(spec)
+    return caps
+
+
+def probe_device(device: str | None = None) -> tuple[bool, ScanCapabilities | None, str]:
+    """Initialize a scanner: ask it for all its options and cache what it supports.
+
+    Runs ``scanimage -A -d <device>`` (``--all-options``), parses the available
+    modes/sources/resolutions and stores them so the Scans page can offer exactly
+    what the hardware does. Returns ``(ok, capabilities, message)``.
+    """
+    if not available():
+        return False, None, "scanimage is not installed."
+    dev = device or first_device()
+    res = shell.run([settings.scanimage, "-d", dev, "-A"], timeout=settings.command_timeout)
+    if not res.ok:
+        return False, None, res.output or "Scanner did not respond."
+    caps = parse_capabilities(dev, res.stdout)
+    if not (caps.modes or caps.sources or caps.resolutions or caps.resolution_range):
+        return False, None, "Connected, but no scan options were reported."
+    try:
+        _save_caps(caps)
+    except OSError as exc:
+        return True, caps, f"Detected options but could not save them: {exc}"
+    parts = []
+    if caps.modes:
+        parts.append(f"{len(caps.modes)} modes")
+    if caps.sources:
+        parts.append(f"{len(caps.sources)} sources")
+    choices = caps.resolution_choices()
+    if choices:
+        parts.append(f"resolution up to {max(choices)} dpi")
+    return True, caps, "Scanner initialized — " + ", ".join(parts) + "."
+
+
+def _save_caps(caps: ScanCapabilities) -> None:
+    path = settings.scan_caps_file
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(asdict(caps), indent=2))
+    tmp.replace(path)
+
+
+def capabilities() -> ScanCapabilities | None:
+    """The cached capabilities from the last successful init, or ``None``."""
+    try:
+        with open(settings.scan_caps_file) as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or "device" not in data:
+        return None
+    rng = data.get("resolution_range")
+    return ScanCapabilities(
+        device=data.get("device", ""),
+        modes=list(data.get("modes") or []),
+        sources=list(data.get("sources") or []),
+        resolutions=[int(r) for r in (data.get("resolutions") or [])],
+        resolution_range=(int(rng[0]), int(rng[1])) if rng else None,
+        detected_at=data.get("detected_at", ""),
+    )
+
+
+def effective_options() -> tuple[list[str], list[str], list[int], ScanCapabilities | None]:
+    """Scan form choices — detected capabilities if initialized, else defaults.
+
+    Returns ``(modes, sources, resolutions, caps)`` where *caps* is the cached
+    :class:`ScanCapabilities` (or ``None`` when the scanner hasn't been
+    initialized yet), so the UI can note whether it's showing detected options.
+    """
+    caps = capabilities()
+    if caps is None:
+        return list(DEFAULT_MODES), list(DEFAULT_SOURCES), list(DEFAULT_RESOLUTIONS), None
+    modes = caps.modes or list(DEFAULT_MODES)
+    sources = caps.sources or list(DEFAULT_SOURCES)
+    return modes, sources, caps.resolution_choices(), caps
 
 
 # --------------------------------------------------------------------------- #

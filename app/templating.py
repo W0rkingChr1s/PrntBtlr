@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import __version__
 from .config import settings
-from .services import updater
+from .services import features, updater
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
@@ -29,8 +29,11 @@ def render(request: Request, name: str, **context):
         "tagline": settings.tagline,
         "flash": _read_flash(request),
         "nav_active": context.pop("nav_active", ""),
+        # Which top-level functions are switched on (drives the navigation).
+        "features": features.states(),
         # Cached "update available" notice (reads a tiny state file, no network).
-        "update_notice": updater.notice(),
+        # Suppressed when the self-update function is switched off.
+        "update_notice": updater.notice() if features.is_enabled("updates") else None,
     }
     base.update(context)
     return templates.TemplateResponse(request, name, base)

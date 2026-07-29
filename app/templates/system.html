@@ -26,6 +26,27 @@
   </div>
 </div>
 
+<div class="card gap" id="features">
+  <h2>Functions</h2>
+  <p class="muted">Switch the panel's top-level functions on or off. A function you
+    turn off disappears from the navigation and its pages stop responding — handy
+    for a print-only or scan-only box.</p>
+  <form method="post" action="/system/features">
+    <div class="feature-toggles gap">
+    {% for f in feature_list %}
+      <label class="check feature">
+        <input type="checkbox" name="{{ f.key }}" value="true" {{ 'checked' if f.enabled }}>
+        <span><strong>{{ f.label }}</strong>
+          <span class="muted">— {{ f.description }}</span></span>
+      </label>
+    {% endfor %}
+    </div>
+    <div class="btn-row gap">
+      <button class="btn sm primary" type="submit">Save functions</button>
+    </div>
+  </form>
+</div>
+
 <div class="card gap">
   <h2>Services</h2>
   <table>
@@ -70,6 +91,10 @@
 
 <div class="card gap" id="updates">
   <h2>Updates <span class="sub">installed: v{{ updates.current }} · {{ updates.channel }} channel</span></h2>
+{% if not features.updates %}
+  <p class="muted">Self-updates are switched off. Turn the
+    <a href="#features">Self-updates function</a> back on to check for and install releases.</p>
+{% else %}
 
   {% if updates.available %}
   <p>
@@ -113,6 +138,7 @@
     — failed: <span class="mono">{{ updates.last_error }}</span>{% endif %}.
     Updates come from <a href="https://github.com/{{ update_repo }}/releases" target="_blank">GitHub
     Releases</a> only.</div>
+{% endif %}
 </div>
 
 <div class="card gap">
