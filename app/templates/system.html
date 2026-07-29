@@ -29,8 +29,9 @@
 <div class="card gap" id="features">
   <h2>Functions</h2>
   <p class="muted">Switch the panel's top-level functions on or off. A function you
-    turn off disappears from the navigation and its pages stop responding — handy
-    for a print-only or scan-only box.</p>
+    turn off disappears from the navigation, its pages stop responding, and its
+    background services are stopped and disabled on boot — so a print-only or
+    scan-only box only runs what it needs. Turning it back on starts them again.</p>
   <form method="post" action="/system/features">
     <div class="feature-toggles gap">
     {% for f in feature_list %}

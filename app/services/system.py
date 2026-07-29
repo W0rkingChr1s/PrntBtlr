@@ -71,6 +71,25 @@ def enable_service(name: str) -> shell.Result:
     return _systemctl("enable", name)
 
 
+def start_service(name: str) -> shell.Result:
+    if name not in settings.services:
+        return shell.Result(False, 1, "", f"unknown service: {name}")
+    return _systemctl("start", name)
+
+
+def stop_service(name: str) -> shell.Result:
+    if name not in settings.services:
+        return shell.Result(False, 1, "", f"unknown service: {name}")
+    return _systemctl("stop", name)
+
+
+def disable_service(name: str) -> shell.Result:
+    """Stop *name* from starting on boot (paired with :func:`stop_service`)."""
+    if name not in settings.services:
+        return shell.Result(False, 1, "", f"unknown service: {name}")
+    return _systemctl("disable", name)
+
+
 def _primary_ip() -> str:
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

@@ -21,10 +21,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Self-updates — on or off. A switched-off function disappears from the
   navigation and its pages 303 back to the dashboard, so a print-only or
   scan-only box shows only what it uses; the self-update background checker also
-  pauses while updates are off. Choices persist in
+  pauses while updates are off. Turning a function off now also **stops and
+  disables the systemd units it owns** (`cups` for Printers; `scanbd` +
+  `prntbtlr-scan-listen` for Scanning) so they don't keep running on a box that
+  no longer uses them — turning it back on enables and starts them again. Shared
+  units (`smbd`, `avahi-daemon`) are left alone. Choices persist in
   `/etc/prntbtlr/features.json` (override with `PRNTBTLR_FEATURE_STATE_FILE`) and
   default to *on*, so upgrades never silently hide anything. New
-  `app/services/features.py` service and `POST /system/features` route.
+  `app/services/features.py` service (with `apply_services()`), `POST
+  /system/features` route, and `system.start_service`/`stop_service`/
+  `disable_service` helpers.
 
 - **Scanner initialization on the Add-printer page.** Multifunction devices are
   also scanners, so setup now has an *Initialize scanner* step: it runs
