@@ -126,6 +126,94 @@ def test_list_scans_sorted_newest_first(tmp_path, monkeypatch):
     assert [s.name for s in scans] == ["scan_new.pdf", "scan_old.pdf"]
 
 
+def test_parse_capabilities_discrete_lists():
+    out = """
+Options specific to device `pixma:MX870_1A2B3C':
+  Scan mode:
+    --resolution 75|150|300|600|1200dpi [75]
+        Sets the resolution of the scanned image.
+    --mode Color|Gray|Lineart [Color]
+        Selects the scan mode.
+    --source Flatbed|Automatic Document Feeder|Automatic Document Feeder (Duplex) [Flatbed]
+        Selects the scan source.
+  Geometry:
+    -l 0..216.07mm [0]
+"""
+    caps = scan.parse_capabilities("pixma:MX870_1A2B3C", out)
+    assert caps.modes == ["Color", "Gray", "Lineart"]
+    assert "Automatic Document Feeder" in caps.sources
+    assert "Automatic Document Feeder (Duplex)" in caps.sources  # value with spaces & parens
+    assert caps.resolutions == [75, 150, 300, 600, 1200]
+    assert caps.resolution_range is None
+    assert caps.resolution_choices() == [75, 150, 300, 600, 1200]
+
+
+def test_parse_capabilities_resolution_range():
+    out = "    --resolution 75..1200dpi (in steps of 1) [75]\n    --mode Color|Gray [Color]\n"
+    caps = scan.parse_capabilities("dev", out)
+    assert caps.resolution_range == (75, 1200)
+    assert caps.resolutions == []
+    # A pick list is derived from the range, bounded by it.
+    assert caps.resolution_choices() == [75, 150, 300, 600, 1200]
+
+
+def test_probe_device_saves_capabilities(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "scan_caps_file", tmp_path / "caps.json")
+    monkeypatch.setattr(scan, "available", lambda: True)
+    out = "    --mode Color|Gray [Color]\n    --source Flatbed [Flatbed]\n    --resolution 150|300dpi [150]\n"
+    monkeypatch.setattr(scan.shell, "run", lambda cmd, **k: scan.shell.Result(True, 0, out, ""))
+
+    ok, caps, msg = scan.probe_device("pixma")
+    assert ok and caps is not None
+    assert "initialized" in msg.lower()
+    # Cached and reloadable.
+    reloaded = scan.capabilities()
+    assert reloaded is not None
+    assert reloaded.modes == ["Color", "Gray"]
+    assert reloaded.resolutions == [150, 300]
+
+
+def test_probe_device_reports_no_options(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "scan_caps_file", tmp_path / "caps.json")
+    monkeypatch.setattr(scan, "available", lambda: True)
+    monkeypatch.setattr(
+        scan.shell, "run", lambda cmd, **k: scan.shell.Result(True, 0, "nothing\n", "")
+    )
+    ok, caps, msg = scan.probe_device("pixma")
+    assert not ok and caps is None
+    assert "no scan options" in msg.lower()
+    assert not (tmp_path / "caps.json").exists()  # nothing cached on an empty probe
+
+
+def test_probe_device_unavailable(monkeypatch):
+    monkeypatch.setattr(scan, "available", lambda: False)
+    ok, caps, msg = scan.probe_device()
+    assert not ok and caps is None
+    assert "not installed" in msg
+
+
+def test_effective_options_falls_back_to_defaults(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "scan_caps_file", tmp_path / "missing.json")
+    modes, sources, resolutions, caps = scan.effective_options()
+    assert caps is None
+    assert modes == list(scan.DEFAULT_MODES)
+    assert resolutions == list(scan.DEFAULT_RESOLUTIONS)
+
+
+def test_effective_options_uses_detected(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "scan_caps_file", tmp_path / "caps.json")
+    monkeypatch.setattr(scan, "available", lambda: True)
+    out = "    --mode Color [Color]\n    --source ADF [ADF]\n    --resolution 200|400dpi [200]\n"
+    monkeypatch.setattr(scan.shell, "run", lambda cmd, **k: scan.shell.Result(True, 0, out, ""))
+    scan.probe_device("dev")
+
+    modes, sources, resolutions, caps = scan.effective_options()
+    assert caps is not None
+    assert modes == ["Color"]
+    assert sources == ["ADF"]
+    assert resolutions == [200, 400]
+
+
 def test_list_scans_ignores_in_progress_dotfiles(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "scan_dir", tmp_path)
     (tmp_path / "scan_done.pdf").write_bytes(b"%PDF done")

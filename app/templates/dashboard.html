@@ -2,8 +2,8 @@
 {% block title %}Dashboard{% endblock %}
 {% block heading %}Dashboard{% endblock %}
 {% block actions %}
-  <a class="btn ghost sm" href="/printers">Manage printers</a>
-  <a class="btn primary sm" href="/scans">Scan now</a>
+  {% if features.printers %}<a class="btn ghost sm" href="/printers">Manage printers</a>{% endif %}
+  {% if features.scans %}<a class="btn primary sm" href="/scans">Scan now</a>{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -31,6 +31,7 @@
 </div>
 
 <div class="grid cols-2 gap">
+  {% if features.printers %}
   <div class="card">
     <h2>Printers</h2>
     {% if not cups.available %}
@@ -60,6 +61,7 @@
         <div class="gap"><a class="btn primary sm" href="/printers/add">Add a printer</a></div></div>
     {% endif %}
   </div>
+  {% endif %}
 
   <div class="card">
     <h2>Services</h2>
@@ -68,11 +70,14 @@
 </div>
 
 <div class="grid cols-2 gap">
+  {% if features.printers %}
   <div class="card">
     <h2 class="spread"><span>Print queue</span></h2>
     <div id="jobs-panel">{% include "partials/jobs.html" %}</div>
   </div>
+  {% endif %}
 
+  {% if features.scans %}
   <div class="card">
     <h2>Latest scans</h2>
     {% if scans %}
@@ -91,6 +96,7 @@
       <div class="empty"><div class="big">📄</div>No scans yet.</div>
     {% endif %}
   </div>
+  {% endif %}
 </div>
 
 <div class="card gap">

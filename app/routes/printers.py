@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Form, Request
 
-from ..services import cups
+from ..services import cups, scan
 from ..templating import redirect, render
 
 router = APIRouter(prefix="/printers")
@@ -30,7 +30,21 @@ def add_form(request: Request):
         nav_active="printers",
         devices=cups.list_devices(),
         drivers=cups.list_drivers(),
+        scan_available=scan.available(),
+        scan_devices=scan.list_devices() if scan.available() else [],
+        capabilities=scan.capabilities(),
     )
+
+
+@router.post("/scanner/init")
+def scanner_init(device: str = Form("")):
+    """Initialize the scanner: probe it for its supported modes/sources/resolutions.
+
+    Part of setting up a multifunction device — once detected, the Scans page
+    offers exactly what the hardware supports instead of a generic list.
+    """
+    ok, _, message = scan.probe_device(device.strip() or None)
+    return redirect("/printers/add", message, "success" if ok else "error")
 
 
 @router.post("/add")

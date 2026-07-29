@@ -58,6 +58,60 @@
   </form>
 </div>
 
+<div class="card gap" id="scanner-init">
+  <h2>Initialize scanner <span class="sub">— multifunction devices</span></h2>
+  <p class="muted">If this device also scans, run an initialization pass. PrntBtlr
+    asks the scanner which modes, sources and resolutions it supports and remembers
+    them, so the Scans page offers exactly what your hardware can do.</p>
+
+  {% if not scan_available %}
+    <div class="empty">SANE (<span class="mono">scanimage</span>) is not installed —
+      scanning isn't available on this host.</div>
+  {% else %}
+    <form method="post" action="/printers/scanner/init"
+          onsubmit="var b=this.querySelector('button[type=submit]');b.disabled=true;b.textContent='Detecting…';">
+      <div class="field">
+        <label for="scan-device">Scanner device</label>
+        {% if scan_devices %}
+          <select id="scan-device" name="device">
+            {% for d in scan_devices %}
+              <option value="{{ d.device }}">{{ d.description or d.device }}</option>
+            {% endfor %}
+          </select>
+        {% else %}
+          <input type="text" id="scan-device" name="device" placeholder="pixma">
+          <div class="help">No scanner auto-detected — leave blank to use the first
+            available device, or enter its SANE name.</div>
+        {% endif %}
+      </div>
+      <button class="btn primary" type="submit">🔍 Detect scan capabilities</button>
+      <div class="help gap">This talks to the scanner (<span class="mono">scanimage -A</span>)
+        and can take a few seconds while the USB bus settles.</div>
+    </form>
+
+    {% if capabilities %}
+    <table class="gap">
+      <tbody>
+        <tr><td class="muted">Device</td><td class="mono">{{ capabilities.device }}</td></tr>
+        <tr><td class="muted">Modes</td>
+          <td>{{ capabilities.modes | join(', ') if capabilities.modes else '—' }}</td></tr>
+        <tr><td class="muted">Sources</td>
+          <td>{{ capabilities.sources | join(', ') if capabilities.sources else '—' }}</td></tr>
+        <tr><td class="muted">Resolutions</td>
+          <td>{% if capabilities.resolution_range %}
+                {{ capabilities.resolution_range[0] }}–{{ capabilities.resolution_range[1] }} dpi
+              {% elif capabilities.resolutions %}
+                {{ capabilities.resolutions | join(', ') }} dpi
+              {% else %}—{% endif %}</td></tr>
+        <tr><td class="muted">Detected</td><td class="muted">{{ capabilities.detected_at }}</td></tr>
+      </tbody>
+    </table>
+    <div class="help gap">These now drive the <a href="/scans">Scans</a> page. Re-run the
+      detection any time the scanner or its driver changes.</div>
+    {% endif %}
+  {% endif %}
+</div>
+
 {% if not drivers %}
 <div class="card gap"><div class="empty">
   No drivers found. Install Gutenprint first:

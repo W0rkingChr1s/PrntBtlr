@@ -138,3 +138,30 @@ def test_prtg_services_active_allows_idle_scan_button():
 def test_unknown_scan_download_redirects(client):
     r = client.get("/scans/file/nope.pdf", follow_redirects=False)
     assert r.status_code == 303
+
+
+def test_printer_add_offers_scanner_init(client, monkeypatch):
+    from app.routes import printers as printers_route
+
+    # Pretend SANE is present so the init form (not the "not installed" note) shows.
+    monkeypatch.setattr(printers_route.scan, "available", lambda: True)
+    monkeypatch.setattr(printers_route.scan, "list_devices", lambda: [])
+    monkeypatch.setattr(printers_route.scan, "capabilities", lambda: None)
+
+    body = client.get("/printers/add").text
+    assert "Initialize scanner" in body
+    assert "/printers/scanner/init" in body
+
+
+def test_scanner_init_endpoint_redirects(client, monkeypatch):
+    from app.routes import printers as printers_route
+
+    monkeypatch.setattr(
+        printers_route.scan,
+        "probe_device",
+        lambda device=None: (True, None, "Scanner initialized — 3 modes."),
+    )
+    r = client.post("/printers/scanner/init", data={"device": "pixma"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert "/printers/add" in r.headers["location"]
+    assert "initialized" in r.headers["location"].lower()

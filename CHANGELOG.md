@@ -16,6 +16,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   but the intentional idle one doesn't.
 
 ### Added
+- **Switch top-level functions on and off.** A new *Functions* card on the
+  System page lets you turn the panel's main functions — Printers, Scanning,
+  Self-updates — on or off. A switched-off function disappears from the
+  navigation and its pages 303 back to the dashboard, so a print-only or
+  scan-only box shows only what it uses; the self-update background checker also
+  pauses while updates are off. Choices persist in
+  `/etc/prntbtlr/features.json` (override with `PRNTBTLR_FEATURE_STATE_FILE`) and
+  default to *on*, so upgrades never silently hide anything. New
+  `app/services/features.py` service and `POST /system/features` route.
+
+- **Scanner initialization on the Add-printer page.** Multifunction devices are
+  also scanners, so setup now has an *Initialize scanner* step: it runs
+  `scanimage -A` against the device, detects the supported scan **modes**,
+  **sources** and **resolutions** (both discrete lists and continuous ranges),
+  and caches them in `/etc/prntbtlr/scan_caps.json`. The Scans page then offers
+  exactly what the hardware supports instead of a generic list, falling back to
+  the previous defaults until a scanner is initialized. New
+  `scan.probe_device()`, `scan.capabilities()`, `scan.effective_options()` and
+  `POST /printers/scanner/init`.
+
 - **Native PRTG output on `/healthz` + monitoring docs.** PRTG's *HTTP Data
   Advanced* sensor only accepts JSON in its own `{"prtg": {"result": […]}}`
   shape and rejects the plain payload with error PE231. `/healthz?format=prtg`

@@ -40,7 +40,7 @@ Press the scan button → a PDF lands in a network folder (`/srv/scans`, shared 
 <td width="33%" valign="top">
 
 ### ⚙️ Manage
-Add/remove printers, watch & clear the queue, pause/resume, set the error policy, control services — all from one panel.
+Add/remove printers, watch & clear the queue, pause/resume, set the error policy, control services — all from one panel. Switch whole functions on/off and initialize the scanner during setup.
 
 </td>
 </tr>
@@ -303,8 +303,30 @@ Settings come from environment variables (prefix `PRNTBTLR_`) or
 | `PRNTBTLR_SELF_REPAIR_ENABLED` | `false` | Repair common breakages automatically in the background (see below). |
 | `PRNTBTLR_SELF_REPAIR_INTERVAL` | `300` | Seconds between background self-repair sweeps. |
 | `PRNTBTLR_HEALTH_MIN_FREE_MB` | `200` | Warn below this much free space in the scan folder. |
+| `PRNTBTLR_FEATURE_STATE_FILE` | `/etc/prntbtlr/features.json` | Where the on/off state of the top-level functions is stored. |
+| `PRNTBTLR_SCAN_CAPS_FILE` | `/etc/prntbtlr/scan_caps.json` | Where detected scanner capabilities are cached (see below). |
 
 Restart after changes: `sudo systemctl restart prntbtlr`.
+
+### Switching functions on & off
+
+The **System → Functions** card turns the panel's top-level functions —
+**Printers**, **Scanning**, **Self-updates** — on or off. A switched-off function
+drops out of the navigation and its pages redirect back to the dashboard, so a
+print-only or scan-only box only exposes what it uses (and the self-update
+checker stops polling GitHub while updates are off). Every function ships
+enabled and the choices persist in `features.json`, so an upgrade never silently
+hides something you relied on.
+
+### Initializing the scanner
+
+On a multifunction printer, the **Add printer → Initialize scanner** step probes
+the device with `scanimage -A` and detects the scan **modes**, **sources** and
+**resolutions** it actually supports. Those are cached and drive the **Scans**
+page, so its dropdowns match your hardware instead of showing a generic list.
+Until you initialize a scanner (or if the probe finds nothing) the panel falls
+back to sensible defaults. Re-run the detection whenever the scanner or its
+driver changes.
 
 ### Health checks & self-repair
 

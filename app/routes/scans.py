@@ -14,6 +14,7 @@ router = APIRouter(prefix="/scans")
 
 @router.get("")
 def scans_page(request: Request):
+    modes, sources, resolutions, caps = scan.effective_options()
     return render(
         request,
         "scans.html",
@@ -24,6 +25,12 @@ def scans_page(request: Request):
         paper_choices=scan.PAPER_CHOICES,
         paper_default=settings.scan_paper,
         scans=scan.list_scans(),
+        modes=modes,
+        sources=sources,
+        resolutions=resolutions,
+        mode_labels=scan.MODE_LABELS,
+        source_labels=scan.SOURCE_LABELS,
+        capabilities=caps,
     )
 
 

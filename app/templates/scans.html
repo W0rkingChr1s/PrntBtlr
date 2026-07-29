@@ -26,16 +26,17 @@
           <div class="field">
             <label for="source">Source</label>
             <select id="source" name="source">
-              <option value="Flatbed">Flatbed (glass)</option>
-              <option value="Automatic Document Feeder">Document feeder (ADF)</option>
+              {% for s in sources %}
+              <option value="{{ s }}">{{ source_labels.get(s, s) }}</option>
+              {% endfor %}
             </select>
           </div>
           <div class="field">
             <label for="mode">Mode</label>
             <select id="mode" name="mode">
-              <option value="Color">Color</option>
-              <option value="Gray">Grayscale</option>
-              <option value="Lineart">Black &amp; white</option>
+              {% for m in modes %}
+              <option value="{{ m }}">{{ mode_labels.get(m, m) }}</option>
+              {% endfor %}
             </select>
           </div>
         </div>
@@ -43,9 +44,9 @@
           <div class="field">
             <label for="resolution">Resolution (DPI)</label>
             <select id="resolution" name="resolution">
-              <option value="150">150 — draft</option>
-              <option value="300" selected>300 — standard</option>
-              <option value="600">600 — high</option>
+              {% for r in resolutions %}
+              <option value="{{ r }}" {{ 'selected' if r == 300 }}>{{ r }}</option>
+              {% endfor %}
             </select>
           </div>
           <div class="field">
@@ -70,6 +71,12 @@
         <button class="btn primary" type="submit">📄 Scan</button>
         <div class="help gap">A single page is scanned and saved as PDF. The hardware
           scan button still works independently and saves multi-page PDFs.</div>
+        <div class="help">
+          {% if capabilities %}Options detected from <span class="mono">{{ capabilities.device }}</span>
+            on {{ capabilities.detected_at }}.
+          {% else %}Showing generic options —
+            <a href="/printers/add#scanner-init">initialize the scanner</a> to match your hardware.
+          {% endif %}</div>
       </form>
     {% endif %}
   </div>

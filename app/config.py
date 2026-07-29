@@ -91,6 +91,19 @@ class Settings(BaseSettings):
     # Scanning can take a while (warm-up + ADF); give it room.
     scan_timeout: int = 300
 
+    # --- Feature toggles ---------------------------------------------------
+    # Which top-level functions of the panel are switched on. Every function
+    # ships enabled; the System page lets you turn ones you don't use off, which
+    # hides them from the navigation and blocks their routes. The choices live in
+    # a tiny JSON state file so they survive restarts and updates.
+    feature_state_file: Path = Path("/etc/prntbtlr/features.json")
+
+    # --- Scanner initialization -------------------------------------------
+    # Detected scanner capabilities (available modes/sources/resolutions) from
+    # the "Initialize scanner" step on the Add-printer page, cached here so the
+    # Scans page can offer exactly what the hardware supports.
+    scan_caps_file: Path = Path("/etc/prntbtlr/scan_caps.json")
+
     # --- Health checks & self-repair --------------------------------------
     # The "control instances": the panel continuously verifies that the box is
     # actually working (network up, services running, printer connected & set
