@@ -18,6 +18,7 @@ import logging
 from dataclasses import dataclass
 
 from ..config import settings
+from . import system
 
 log = logging.getLogger("prntbtlr.features")
 
@@ -60,6 +61,22 @@ FEATURES: tuple[Feature, ...] = (
 )
 
 _BY_KEY: dict[str, Feature] = {f.key: f for f in FEATURES}
+
+# systemd units each function owns. Switching a function off stops and disables
+# these (no point running the print daemon on a scan-only box, and vice versa);
+# switching it back on enables and starts them again. Units not in this map (or
+# not installed) are left untouched. ``smbd``/``avahi-daemon`` are deliberately
+# absent — they're shared infrastructure, not owned by one function.
+FEATURE_SERVICES: dict[str, tuple[str, ...]] = {
+    "printers": ("cups",),
+    "scans": ("scanbd", "prntbtlr-scan-listen"),
+    "updates": (),
+}
+
+
+def services_for(key: str) -> tuple[str, ...]:
+    """systemd units owned by feature *key* (empty if none/unknown)."""
+    return FEATURE_SERVICES.get(key, ())
 
 
 # --------------------------------------------------------------------------- #
@@ -121,3 +138,32 @@ def save(selected: set[str]) -> None:
         state[f.key] = f.key in selected
     _save_state(state)
     log.info("features updated: %s", {f.key: f.key in selected for f in FEATURES})
+
+
+def apply_services(before: dict[str, bool], after: dict[str, bool]) -> list[str]:
+    """Start/stop the systemd units of any function that just changed state.
+
+    A function switched *off* has its units stopped and disabled on boot; one
+    switched *on* has them enabled and started again. Units that aren't installed
+    (or when systemctl is unavailable) are skipped, so a scan-only box that never
+    had ``cups`` doesn't error. Returns short human-readable notes for the flash.
+    """
+    notes: list[str] = []
+    for key in FEATURE_SERVICES:
+        was, now = before.get(key, True), after.get(key, True)
+        if was == now:
+            continue
+        for unit in services_for(key):
+            # Skip units the host doesn't have (or when systemctl is missing —
+            # service_state reports "not-installed"/"unknown" in both cases).
+            if system.service_state(unit).status in ("not-installed", "unknown"):
+                continue
+            if now:  # switched on → enable + start
+                system.enable_service(unit)
+                res = system.start_service(unit)
+                notes.append(f"started {unit}" if res.ok else f"could not start {unit}")
+            else:  # switched off → stop + disable
+                system.disable_service(unit)
+                res = system.stop_service(unit)
+                notes.append(f"stopped {unit}" if res.ok else f"could not stop {unit}")
+    return notes

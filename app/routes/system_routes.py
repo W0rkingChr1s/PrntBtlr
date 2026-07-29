@@ -36,9 +36,16 @@ async def save_features(request: Request):
     """
     form = await request.form()
     selected = {f.key for f in features.FEATURES if form.get(f.key)}
+    before = features.states()
     features.save(selected)
+    after = features.states()
+    # Turning a function off stops (and disables) its services, and vice versa.
+    service_notes = features.apply_services(before, after)
+
     off = [f.label for f in features.all_features() if not f.enabled]
     detail = "all functions on" if not off else f"off: {', '.join(off)}"
+    if service_notes:
+        detail += f" ({'; '.join(service_notes)})"
     return redirect("/system#features", f"Functions updated — {detail}.")
 
 
