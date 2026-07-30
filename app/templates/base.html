@@ -45,7 +45,7 @@
       {% if flash %}
       <div class="flash flash-{{ flash.level }}" role="status">
         <span>{{ flash.message }}</span>
-        <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+        <button type="button" class="flash-close" aria-label="Dismiss" onclick="this.parentElement.remove()">×</button>
       </div>
       {% endif %}
 
@@ -55,7 +55,7 @@
           Update {{ update_notice.tag }} is available —
           <a href="/system#updates">install it from the System page</a>.
         </span>
-        <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+        <button type="button" class="flash-close" aria-label="Dismiss" onclick="this.parentElement.remove()">×</button>
       </div>
       {% endif %}
 
