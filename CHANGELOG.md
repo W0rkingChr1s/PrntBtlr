@@ -52,9 +52,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - **Webhook reference guide (`docs/webhooks.md`).** Documents the request
   envelope and headers, the `data` payload of every event, HMAC signature
-  verification (Python + Node.js, with the raw-body caveat), and a
-  ready-to-import **n8n → Telegram** recipe (including an HMAC-verifying hardening
-  step). Linked from the README's Webhooks section.
+  verification (Python + Node.js, with the raw-body caveat), and ready-to-import
+  **n8n → Telegram** and **Home Assistant** recipes (the n8n one including an
+  HMAC-verifying hardening step). Linked from the README's Webhooks section.
 - **Real print jobs fire webhooks, not just the test page.** A lightweight CUPS
   job monitor now watches `lpstat` and fires `print.submitted` when any job is
   queued — an AirPrint job from a phone, `lp` from a laptop, or the panel's test
