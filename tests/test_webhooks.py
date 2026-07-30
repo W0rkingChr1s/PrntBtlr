@@ -31,6 +31,44 @@ def test_valid_url():
     assert not webhooks.valid_url("")
 
 
+def test_blocked_target_refuses_loopback_and_link_local():
+    # Loopback would let a webhook probe the box itself (CUPS admin, the panel);
+    # link-local covers cloud metadata endpoints. IP literals need no DNS.
+    assert webhooks.blocked_target("http://127.0.0.1/hook")
+    assert webhooks.blocked_target("http://127.1.2.3:631/admin")
+    assert webhooks.blocked_target("http://localhost/hook")
+    assert webhooks.blocked_target("http://[::1]/hook")
+    assert webhooks.blocked_target("http://169.254.169.254/latest/meta-data/")
+    assert webhooks.blocked_target("http://0.0.0.0/hook")
+
+
+def test_blocked_target_allows_lan_and_unresolvable():
+    # Private LAN addresses are the whole point of webhooks on a home box.
+    assert webhooks.blocked_target("http://192.168.1.50/hook") is None
+    assert webhooks.blocked_target("http://10.0.0.7:5678/webhook/abc") is None
+    # An unresolvable name is allowed — delivery just fails on its own.
+    assert webhooks.blocked_target("http://no-such-host.invalid/hook") is None
+
+
+def test_add_webhook_refuses_blocked_target():
+    ok, msg = webhooks.add_webhook("http://127.0.0.1:631/admin", ["scan.completed"])
+    assert not ok
+    assert "refusing" in msg.lower()
+    assert webhooks.list_webhooks() == []
+
+
+def test_deliver_refuses_blocked_target_without_posting(monkeypatch):
+    # Even an endpoint already in the state file (hand-edited, or a hostname
+    # that now resolves to loopback — DNS rebinding) is refused at delivery.
+    monkeypatch.setattr(
+        webhooks, "_post", lambda *a: (_ for _ in ()).throw(AssertionError("posted"))
+    )
+    hook = webhooks.Webhook("id", "http://127.0.0.1/hook", ["scan.completed"])
+    ok, detail = webhooks.deliver(hook, "scan.completed", {})
+    assert not ok
+    assert "blocked" in detail
+
+
 def test_valid_events_filters_and_orders():
     # Unknown keys dropped; result follows the catalogue order, not input order.
     got = webhooks.valid_events(["printer.added", "scan.completed", "bogus"])

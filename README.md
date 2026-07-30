@@ -456,7 +456,18 @@ listener described above (`scanbd` handles the button on everything else).
 
 The systemd service runs as **root** because it manages CUPS, SANE and systemd,
 which need privileges. That's a reasonable trade-off for a single-purpose home
-print server on a trusted LAN. The panel has **no authentication** by default —
+print server on a trusted LAN — and the unit confines what that root can do:
+the filesystem is read-only except `/etc/prntbtlr` and the scan folder
+(`ProtectSystem=strict`), and kernel/namespace/realtime surfaces are switched
+off (see `deploy/prntbtlr.service`). Self-updates still work — they run as a
+transient unit outside the sandbox.
+
+Webhook targets are checked against an SSRF blocklist: URLs that resolve to
+the host itself (loopback) or to link-local space (e.g. cloud metadata
+addresses) are refused, both when added and again on every delivery. Private
+LAN addresses stay allowed — that's where your automation lives.
+
+The panel has **no authentication** by default —
 don't expose port 80 to the internet. To harden: put it behind a reverse proxy
 with auth, or restrict access by firewall. The Samba share defaults to guest
 access (`guest ok`) for convenience; switch to `guest ok = no` + `smbpasswd` for
