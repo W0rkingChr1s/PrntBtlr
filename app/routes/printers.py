@@ -103,8 +103,9 @@ def error_policy(name: str, policy: str = Form(...)):
 @router.post("/{name}/test")
 def test_page(name: str):
     res = cups.print_test_page(name)
-    if res.ok:
-        webhooks.emit("print.submitted", {"printer": name, "kind": "test-page"})
+    # The test page is emitted as a print.submitted webhook by the CUPS job
+    # monitor (jobmon), same as any AirPrint/lp job — no separate emit here, so
+    # a test page never double-fires.
     msg = f"Test page sent to '{name}'." if res.ok else f"Failed: {res.output}"
     return redirect("/printers", msg, "success" if res.ok else "error")
 

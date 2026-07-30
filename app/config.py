@@ -125,6 +125,10 @@ class Settings(BaseSettings):
     # health.recovered events. Only runs while at least one enabled webhook is
     # subscribed to a health event, so idle installs do no extra work.
     webhook_health_interval: int = 60
+    # Seconds between CUPS job polls that drive print.submitted / print.completed
+    # for real jobs (AirPrint, lp, the panel's test page). Same gating: only
+    # polls while an enabled webhook subscribes to a print event.
+    webhook_jobs_interval: int = 15
 
     # --- Scanner initialization -------------------------------------------
     # Detected scanner capabilities (available modes/sources/resolutions) from

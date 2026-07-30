@@ -57,6 +57,7 @@ EVENTS: tuple[EventType, ...] = (
     EventType("printer.added", "Printer added", "Printers"),
     EventType("printer.deleted", "Printer removed", "Printers"),
     EventType("print.submitted", "Print job submitted", "Printers"),
+    EventType("print.completed", "Print job completed", "Printers"),
     EventType("health.degraded", "Health degraded (warning/failure)", "Health"),
     EventType("health.recovered", "Health recovered", "Health"),
     EventType("repair.performed", "Self-repair performed", "Health"),
@@ -72,6 +73,8 @@ for _e in EVENTS:
 
 # Health events, so the background monitor only runs when one is subscribed.
 HEALTH_EVENTS = frozenset({"health.degraded", "health.recovered"})
+# Print-job events, watched by the CUPS job monitor (jobmon) on the same terms.
+PRINT_EVENTS = frozenset({"print.submitted", "print.completed"})
 
 
 @dataclass
@@ -322,8 +325,18 @@ def send_test(hook_id: str) -> tuple[bool, str]:
 # --------------------------------------------------------------------------- #
 # Health-transition monitor (drives health.degraded / health.recovered)
 # --------------------------------------------------------------------------- #
+def has_subscriber(event_keys) -> bool:
+    """True when any enabled endpoint subscribes to at least one of *event_keys*.
+
+    Lets a background monitor skip its work entirely (no shell-outs, no polling)
+    until something actually wants the events it produces.
+    """
+    keys = set(event_keys)
+    return any(h.enabled and ("*" in h.events or keys & set(h.events)) for h in _load())
+
+
 def _has_health_subscriber() -> bool:
-    return any(h.enabled and (set(h.events) & HEALTH_EVENTS or "*" in h.events) for h in _load())
+    return has_subscriber(HEALTH_EVENTS)
 
 
 def note_health(overall: str, previous: str | None) -> str | None:

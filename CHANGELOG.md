@@ -39,6 +39,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   but the intentional idle one doesn't.
 
 ### Added
+- **Real print jobs fire webhooks, not just the test page.** A lightweight CUPS
+  job monitor now watches `lpstat` and fires `print.submitted` when any job is
+  queued — an AirPrint job from a phone, `lp` from a laptop, or the panel's test
+  page — plus a new **`print.completed`** event when it finishes. The payload
+  carries the CUPS job id, printer, user and size. Polling (interval
+  `PRNTBTLR_WEBHOOK_JOBS_INTERVAL`, default 15 s) was chosen over a CUPS notifier
+  so there's nothing to configure in `cupsd.conf` and no IPP subscription lease
+  to renew; like the health monitor it stays idle until an endpoint subscribes,
+  and the first sweep after start records a baseline so a restart never replays
+  old jobs. The test-page route no longer emits its own `print.submitted` (the
+  monitor covers it uniformly, so it can't double-fire). New
+  `app/services/jobmon.py`, `cups.list_jobs(which=…)` for completed jobs, and
+  `webhooks.has_subscriber()`.
 - **Button scans fire the `scan.completed` webhook too.** Hardware scan-button
   scans run outside the web app (`scan2pdf.sh`, driven by `scanbd` /
   `scan-listen.py`), so they previously didn't reach webhooks — only browser

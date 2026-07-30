@@ -43,6 +43,20 @@ def test_list_jobs_parses_and_derives_printer(monkeypatch):
     assert jobs[0].size == 4096
 
 
+def test_list_jobs_which_selects_W_flag(monkeypatch):
+    captured = {}
+
+    def fake_run(cmd, **k):
+        captured["cmd"] = cmd
+        return _result("")
+
+    monkeypatch.setattr(cups.shell, "run", fake_run)
+    cups.list_jobs()
+    assert captured["cmd"] == ["lpstat", "-o"]
+    cups.list_jobs("completed")
+    assert captured["cmd"] == ["lpstat", "-W", "completed", "-o"]
+
+
 def test_list_drivers_filters_by_query(monkeypatch):
     out = (
         "gutenprint.5.3://bjc-MX870/expert Canon PIXMA MX870 - CUPS+Gutenprint\n"

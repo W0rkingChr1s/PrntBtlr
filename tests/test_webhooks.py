@@ -37,6 +37,15 @@ def test_valid_events_filters_and_orders():
     assert got == ["scan.completed", "printer.added"]
 
 
+def test_has_subscriber():
+    webhooks.add_webhook("https://a.example/hook", ["print.submitted"])
+    assert webhooks.has_subscriber(webhooks.PRINT_EVENTS)
+    assert not webhooks.has_subscriber(webhooks.HEALTH_EVENTS)
+    # A disabled endpoint doesn't count.
+    webhooks.set_enabled(webhooks.list_webhooks()[0].id, False)
+    assert not webhooks.has_subscriber(webhooks.PRINT_EVENTS)
+
+
 def test_wants_matching():
     h = webhooks.Webhook("id", "http://x", ["scan.completed"], enabled=True)
     assert h.wants("scan.completed")
