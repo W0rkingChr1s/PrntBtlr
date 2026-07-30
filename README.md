@@ -409,6 +409,12 @@ never stored. To generate a hash yourself:
 /opt/prntbtlr/.venv/bin/python -m app.auth hash    # prompts, prints the hash
 ```
 
+The login form throttles brute-force guessing: after 5 consecutive failures a
+client is locked out for a minute (each further failure restarts the clock).
+Independently of the login, every state-changing request is checked against its
+`Origin`/`Referer` header, so a malicious web page can't trigger panel actions
+from a visitor's browser (CSRF).
+
 > The login protects the UI, not the network: over plain HTTP the session cookie
 > travels in clear. For anything internet-facing, run it behind a TLS reverse
 > proxy. See [`SECURITY.md`](SECURITY.md).

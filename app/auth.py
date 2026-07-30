@@ -16,7 +16,10 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import secrets
+import threading
+import time
 
 from .config import settings
 
@@ -67,6 +70,61 @@ def check_credentials(username: str, password: str) -> bool:
 def auth_is_usable() -> bool:
     """True when auth is enabled *and* a credential is actually configured."""
     return settings.auth_enabled and bool(settings.auth_password or settings.auth_password_hash)
+
+
+# --------------------------------------------------------------------------- #
+# Brute-force throttle
+# --------------------------------------------------------------------------- #
+class LoginThrottle:
+    """Per-client brake on password guessing at the login form.
+
+    After ``max_failures`` consecutive failures a client must wait ``lockout``
+    seconds before the next attempt is even checked; every further failure
+    restarts the clock, so a bot gets one guess per lockout window instead of
+    an unbounded stream. A successful login clears the slate. State is
+    in-memory only — a restart forgives everything, which is fine for slowing
+    online guessing (PBKDF2 already covers offline attacks).
+    """
+
+    def __init__(self, max_failures: int = 5, lockout: float = 60.0, clock=time.monotonic):
+        self.max_failures = max_failures
+        self.lockout = lockout
+        self._clock = clock
+        self._lock = threading.Lock()
+        # client -> (consecutive failures, time of last failure)
+        self._state: dict[str, tuple[int, float]] = {}
+
+    def retry_after(self, client: str) -> int:
+        """Seconds until *client* may try again (0 = not blocked)."""
+        with self._lock:
+            entry = self._state.get(client)
+            if entry is None or entry[0] < self.max_failures:
+                return 0
+            remaining = self.lockout - (self._clock() - entry[1])
+            return math.ceil(remaining) if remaining > 0 else 0
+
+    def note_failure(self, client: str) -> None:
+        now = self._clock()
+        with self._lock:
+            failures = self._state.get(client, (0, now))[0] + 1
+            self._state[client] = (failures, now)
+            # Keep the table bounded: forget clients whose lockout has long
+            # since expired (an hour of silence means they're not attacking).
+            if len(self._state) > 256:
+                cutoff = now - max(3600.0, self.lockout)
+                self._state = {c: e for c, e in self._state.items() if e[1] >= cutoff}
+
+    def note_success(self, client: str) -> None:
+        with self._lock:
+            self._state.pop(client, None)
+
+    def reset(self) -> None:
+        with self._lock:
+            self._state.clear()
+
+
+# Shared instance used by the login route.
+throttle = LoginThrottle()
 
 
 # --------------------------------------------------------------------------- #

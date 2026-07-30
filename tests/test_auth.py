@@ -106,6 +106,38 @@ def test_login_flow(auth_client):
     assert auth_client.get("/", follow_redirects=False).status_code == 303
 
 
+def test_login_throttle_blocks_after_max_failures():
+    now = [0.0]
+    thr = auth.LoginThrottle(max_failures=3, lockout=60.0, clock=lambda: now[0])
+    for _ in range(2):
+        thr.note_failure("1.2.3.4")
+    assert thr.retry_after("1.2.3.4") == 0  # still under the limit
+    thr.note_failure("1.2.3.4")
+    assert thr.retry_after("1.2.3.4") > 0  # third strike locks
+    assert thr.retry_after("5.6.7.8") == 0  # other clients unaffected
+
+    now[0] = 61.0
+    assert thr.retry_after("1.2.3.4") == 0  # lockout served
+    thr.note_failure("1.2.3.4")
+    assert thr.retry_after("1.2.3.4") > 0  # one more failure re-locks at once
+
+    thr.note_success("1.2.3.4")
+    assert thr.retry_after("1.2.3.4") == 0  # success clears the slate
+
+
+def test_login_route_throttles_brute_force(auth_client):
+    for _ in range(5):
+        auth_client.post("/login", data={"username": "admin", "password": "wrong"})
+    # Locked out now — even the *correct* password is refused until the
+    # lockout expires, so a guesser gains nothing from hitting it.
+    r = auth_client.post(
+        "/login", data={"username": "admin", "password": "pw"}, follow_redirects=False
+    )
+    assert r.status_code == 200  # re-rendered form, no session
+    assert "try again" in r.text.lower()
+    assert auth_client.get("/", follow_redirects=False).status_code == 303  # still logged out
+
+
 def test_login_open_redirect_blocked(auth_client):
     auth_client.post("/login", data={"username": "admin", "password": "pw"})
     for target in ("https://evil.example", "//evil.example", "/\\evil.example"):

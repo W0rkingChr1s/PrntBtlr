@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ..config import settings
-from . import cache, shell
+from . import cache, shell, statefile
 
 # ``scanimage -L`` is the slowest discovery probe (it waits for the USB bus to
 # settle) yet its answer barely changes between refreshes, so a short cache
@@ -234,11 +234,7 @@ def probe_device(device: str | None = None) -> tuple[bool, ScanCapabilities | No
 
 
 def _save_caps(caps: ScanCapabilities) -> None:
-    path = settings.scan_caps_file
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(asdict(caps), indent=2))
-    tmp.replace(path)
+    statefile.save_json(settings.scan_caps_file, asdict(caps))
 
 
 def capabilities() -> ScanCapabilities | None:
