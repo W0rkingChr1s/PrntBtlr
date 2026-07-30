@@ -191,4 +191,6 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   .content { padding: 20px; }
   .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: 1fr; }
   .field-row { grid-template-columns: 1fr; }
+  /* Let wide tables scroll on their own instead of pushing the page sideways. */
+  table { display: block; overflow-x: auto; }
 }
