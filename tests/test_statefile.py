@@ -31,6 +31,6 @@ def test_webhook_state_is_owner_only(tmp_path, monkeypatch):
     # world-readable on a multi-user box.
     state = tmp_path / "webhooks.json"
     monkeypatch.setattr(settings, "webhook_state_file", state)
-    ok, _ = webhooks.add_webhook("http://127.0.0.1/hook", ["scan.completed"], secret="s3cret")
+    ok, _ = webhooks.add_webhook("http://192.168.1.50/hook", ["scan.completed"], secret="s3cret")
     assert ok
     assert _mode(state) == 0o600

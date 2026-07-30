@@ -15,5 +15,26 @@ ExecStart=/usr/bin/python3 /opt/prntbtlr/scan-listen.py
 Restart=on-failure
 RestartSec=3
 
+# --- Sandboxing -----------------------------------------------------------
+# Same idea as prntbtlr.service: keep root (raw USB), drop the rest. The
+# filesystem is read-only except the scan folder (scan2pdf.sh writes there;
+# adjust when SCAN_DIR is changed). PrivateDevices stays OFF for /dev/bus/usb.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=-/srv/scans
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+# UNIX for local IPC, IPv4/6 for the scan.completed webhook, netlink for glibc.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
 [Install]
 WantedBy=multi-user.target

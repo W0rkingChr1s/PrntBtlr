@@ -23,5 +23,32 @@ RestartSec=3
 # Binding port 80 only needs this capability, not full root networking.
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 
+# --- Sandboxing -----------------------------------------------------------
+# The panel keeps root (CUPS admin, systemctl, raw USB for SANE all need it),
+# but the sandbox strips everything root that isn't actually used: the whole
+# filesystem is read-only except its two writable directories, and kernel
+# tuning/module/namespace surfaces are off. Self-updates are unaffected —
+# update.sh runs as a systemd-run transient unit *outside* this sandbox, so it
+# can replace /opt/prntbtlr while the panel itself never can.
+NoNewPrivileges=yes
+ProtectSystem=strict
+# State + scans; '-' skips a path that doesn't exist yet. If you change
+# PRNTBTLR_SCAN_DIR, add the new location here.
+ReadWritePaths=-/etc/prntbtlr -/srv/scans
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+# UNIX (cupsd/D-Bus sockets), IPv4/6 (web server, webhooks), netlink (glibc
+# interface enumeration). PrivateDevices stays OFF: scanimage needs /dev/bus/usb.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
 [Install]
 WantedBy=multi-user.target

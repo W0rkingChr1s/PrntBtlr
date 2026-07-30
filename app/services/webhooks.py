@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import secrets
@@ -164,6 +165,45 @@ def valid_url(url: str) -> bool:
     return parts.scheme in ("http", "https") and bool(parts.netloc)
 
 
+def blocked_target(url: str) -> str | None:
+    """Why *url* must not receive webhooks, or ``None`` when it may (SSRF guard).
+
+    The panel POSTs to whatever URL is configured, so without a check a webhook
+    could be pointed at the box itself (loopback — e.g. the CUPS admin API on
+    :631 or this panel's own routes) or at link-local space (cloud metadata
+    endpoints like 169.254.169.254). Private LAN addresses stay allowed —
+    home-automation receivers (n8n, Home Assistant, …) live there by design.
+
+    A hostname that doesn't resolve is allowed through: delivery will fail on
+    its own, and refusing it here would break adding an endpoint that's simply
+    offline right now.
+    """
+    try:
+        host = urlparse(url).hostname
+    except ValueError:
+        return "the URL cannot be parsed"
+    if not host:
+        return "the URL has no host"
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return None
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            continue
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+            ip = ip.ipv4_mapped
+        if ip.is_loopback or ip.is_unspecified:
+            return f"{host} points at this host itself ({ip})"
+        if ip.is_link_local:
+            return f"{host} is a link-local address ({ip})"
+        if ip.is_multicast or ip.is_reserved:
+            return f"{host} is not a routable unicast address ({ip})"
+    return None
+
+
 def valid_events(events: list[str]) -> list[str]:
     """Keep only known event keys, preserving catalogue order and de-duping."""
     chosen = set(events)
@@ -175,6 +215,9 @@ def add_webhook(url: str, events: list[str], secret: str = "") -> tuple[bool, st
     url = url.strip()
     if not valid_url(url):
         return False, "Enter a valid http:// or https:// URL."
+    reason = blocked_target(url)
+    if reason:
+        return False, f"Refusing this target: {reason}."
     keep = valid_events(events)
     if not keep:
         return False, "Pick at least one event to send."
@@ -246,6 +289,15 @@ def _post(url: str, body: bytes, headers: dict[str, str], timeout: int) -> tuple
 
 def deliver(hook: Webhook, event_key: str, payload: dict) -> tuple[bool, str]:
     """Deliver *payload* to one endpoint synchronously. Returns ``(ok, detail)``."""
+    # Re-checked per delivery (not just when the endpoint was added) so a
+    # hostname that later re-resolves to loopback/link-local (DNS rebinding) or
+    # a hand-edited state file can't turn the panel into an SSRF proxy. The
+    # resolve here and the one inside urlopen are still two lookups — a small
+    # TOCTOU window we accept for a LAN tool.
+    reason = blocked_target(hook.url)
+    if reason:
+        log.warning("webhook %s → %s refused: %s", event_key, hook.url, reason)
+        return False, f"blocked target: {reason}"
     body = json.dumps(payload).encode("utf-8")
     # Header names use the canonical HTTP title-case that urllib puts on the wire
     # anyway, so what we document is exactly what a receiver sees (headers are
