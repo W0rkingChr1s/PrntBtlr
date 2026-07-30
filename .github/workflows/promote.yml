@@ -79,15 +79,41 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           LATEST_BETA: ${{ steps.count.outputs.latest_beta }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
+          set -euo pipefail
           stable_tag="${LATEST_BETA%-beta.*}"
           if git rev-parse -q --verify "refs/tags/$stable_tag" >/dev/null; then
             echo "::notice::$stable_tag already exists — nothing to promote."
             exit 0
           fi
           commit="$(git rev-list -n1 "$LATEST_BETA")"
-          git tag "$stable_tag" "$commit"
+
+          # The beta's tree states the beta version, so tagging it as-is would
+          # ship a stable release that reports itself as X.Y.Z-beta.N. Restamp
+          # on top of the promoted commit — same code, honest version.
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q --detach "$commit"
+          bash scripts/stamp-version.sh "${stable_tag#v}"
+          if git diff --quiet -- app/__init__.py pyproject.toml; then
+            echo "::notice::$LATEST_BETA already states ${stable_tag#v}."
+          else
+            git commit -q -m "release: stamp version ${stable_tag#v}" \
+              -- app/__init__.py pyproject.toml
+          fi
+
+          git tag "$stable_tag"
           git push origin "refs/tags/$stable_tag"
+
+          # Carry the stamp onto the default branch when it still points at the
+          # promoted beta; if it has moved on, its own next cut restamps it.
+          if [ -n "${DEFAULT_BRANCH:-}" ] \
+             && [ "$(git rev-parse "origin/$DEFAULT_BRANCH")" = "$commit" ]; then
+            git push origin "HEAD:refs/heads/$DEFAULT_BRANCH" \
+              && echo "::notice::Fast-forwarded $DEFAULT_BRANCH to the stable stamp." \
+              || echo "::warning::Could not update $DEFAULT_BRANCH (protected?)."
+          fi
           # A tag pushed with GITHUB_TOKEN doesn't fire release.yml's tag
           # trigger, so run the workflow for the new tag explicitly.
           gh workflow run release.yml -R "$GITHUB_REPOSITORY" --ref "refs/tags/$stable_tag"

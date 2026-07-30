@@ -45,7 +45,7 @@ Every delivery is an HTTP `POST` with a JSON body in this envelope:
   "event": "scan.completed",
   "timestamp": "2026-07-30T09:15:04Z",
   "app": "PrntBtlr",
-  "version": "0.1.0",
+  "version": "0.3.1",
   "host": "prntbtlr",
   "data": { }
 }

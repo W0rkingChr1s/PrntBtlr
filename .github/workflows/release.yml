@@ -44,6 +44,14 @@ jobs:
             echo "channel=stable" >> "$GITHUB_OUTPUT"
           fi
 
+      # cut-release.yml / promote.yml commit the stamp before tagging, so this is
+      # normally a no-op. A tag pushed by hand (documented in CONTRIBUTING) has
+      # no stamp commit though, and the image is a distribution channel too —
+      # stamp the build tree so it can't ship a stale version. Not committed.
+      - name: Stamp the version into the build tree
+        if: startsWith(github.ref, 'refs/tags/')
+        run: bash scripts/stamp-version.sh "${GITHUB_REF_NAME#v}"
+
       - name: Set up QEMU (for arm64 emulation)
         uses: docker/setup-qemu-action@v4
 

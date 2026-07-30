@@ -25,13 +25,22 @@ if ! command -v git >/dev/null 2>&1; then
   apt-get update -y && apt-get install -y --no-install-recommends git ca-certificates
 fi
 
+# Full history and tags, deliberately not a shallow clone: the installer derives
+# the version it stamps into the panel from the release tags, and `git describe`
+# can't place HEAD when the tagged commits are cut out of the history. The repo
+# is a couple of megabytes either way, so there is nothing to save here.
 if [ -d "$TARGET/.git" ]; then
   echo "==> Updating existing checkout in $TARGET…"
-  git -C "$TARGET" fetch --depth 1 origin "$REF"
+  if [ -e "$TARGET/.git/shallow" ]; then
+    # Left over from an older bootstrap run — give it its history back.
+    git -C "$TARGET" fetch --unshallow --tags origin || git -C "$TARGET" fetch --tags origin
+  else
+    git -C "$TARGET" fetch --tags origin "$REF"
+  fi
   git -C "$TARGET" checkout -B "$REF" "origin/$REF"
 else
   echo "==> Cloning $REPO_URL into $TARGET…"
-  git clone --depth 1 --branch "$REF" "$REPO_URL" "$TARGET"
+  git clone --branch "$REF" "$REPO_URL" "$TARGET"
 fi
 
 echo "==> Running installer…"

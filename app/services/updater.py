@@ -35,7 +35,12 @@ log = logging.getLogger("prntbtlr.updater")
 CHANNELS = ("stable", "beta")
 FAILED_MARKER = "[failed]"
 
-_VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?$")
+# A trailing `+local` part marks a build that is not a release — install.sh
+# stamps it on a git checkout that sits ahead of its last tag. It is ignored for
+# ordering (as in semver build metadata / PEP 440 local versions), so such a box
+# is offered genuinely newer releases but not the one it is already past.
+_VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?(?:\+[0-9A-Za-z.]+)?$")
+# Release tags never carry a local part — this gates what apply() will install.
 _TAG_RE = re.compile(r"^v\d+\.\d+\.\d+(?:-beta\.\d+)?$")
 
 # Fenced blocks first, then inline spans — see _strip_code().
@@ -69,7 +74,11 @@ class UpdateStatus:
 # Versions & release selection
 # --------------------------------------------------------------------------- #
 def parse_version(text: str) -> tuple[int, int, int, int, int] | None:
-    """Sortable key for ``[v]X.Y.Z[-beta.N]`` — a stable ranks above its betas."""
+    """Sortable key for ``[v]X.Y.Z[-beta.N][+local]`` — a stable ranks above its betas.
+
+    A ``+local`` build suffix is accepted and ignored, so ``0.3.1+dev.2.gabc1234``
+    sorts exactly like ``0.3.1``.
+    """
     m = _VERSION_RE.match(text.strip())
     if not m:
         return None

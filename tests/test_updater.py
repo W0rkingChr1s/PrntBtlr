@@ -43,6 +43,26 @@ def test_parse_version_accepts_tags_and_bare_versions():
     assert updater.parse_version("v1.2") is None
 
 
+def test_local_build_suffix_is_accepted_and_ignored_for_ordering():
+    # install.sh stamps `+dev.N.gsha` on a checkout that is ahead of its last
+    # tag. Such a box must sort like the base version: offered later releases,
+    # not the one it is already past.
+    dev = updater.parse_version("0.3.1+dev.4.gabc1234")
+    assert dev == updater.parse_version("0.3.1")
+    assert dev < updater.parse_version("0.4.0")
+    assert updater.parse_version("0.4.0-beta.1+dev.2.g0123456") == updater.parse_version(
+        "0.4.0-beta.1"
+    )
+
+
+def test_start_update_refuses_a_local_build_as_a_target():
+    # `+local` marks a build, never a release tag — there is no tarball to fetch
+    # for it, so the stricter _TAG_RE must still reject it.
+    res = updater.start_update("v0.4.0+dev.1.gabc1234")
+    assert not res.ok
+    assert "invalid release tag" in res.stderr
+
+
 def test_beta_sorts_below_its_stable_release():
     beta = updater.parse_version("v0.2.0-beta.4")
     stable = updater.parse_version("v0.2.0")

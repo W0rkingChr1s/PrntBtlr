@@ -1,6 +1,6 @@
 [project]
 name = "prntbtlr"
-version = "0.1.0"
+version = "0.3.1"
 description = "PrntBtlr — a web server for Raspberry Pi that turns an old USB printer into a managed AirPrint + button-scan station with a friendly control panel."
 readme = "README.md"
 requires-python = ">=3.9"
