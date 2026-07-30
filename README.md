@@ -356,6 +356,10 @@ and (optionally) set a secret; deliveries run in the background, so a slow or
 offline endpoint never holds up the panel. **Test** sends a sample event so you
 can confirm the wiring before relying on it.
 
+> **Full reference:** [`docs/webhooks.md`](docs/webhooks.md) documents every
+> event's payload, signature verification, and a ready-to-import **n8n → Telegram**
+> recipe.
+
 Events you can subscribe to:
 
 | Event | Fires when |
