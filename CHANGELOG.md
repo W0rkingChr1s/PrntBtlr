@@ -6,6 +6,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **The updater skipped v0.3.0 and reported "You are up to date".** A release
+  is ignored when it's marked bad with `[failed]`, but that check was a plain
+  substring search over the release title *and* notes — and the notes are
+  generated from this changelog, which documents the convention by writing the
+  marker out. So v0.3.0's notes contained `[failed]`, the panel read that as
+  "this release is broken", and every install stayed on v0.2.9 on both
+  channels. The marker is now only honoured as prose: inline code spans and
+  fenced blocks are stripped before looking for it, so documenting the
+  convention no longer disables updates. Marking a release bad works exactly as
+  before — put the marker in the release title or notes as plain text. The
+  promote workflow, which counts positive betas by the same rule, got the same
+  fix (it would otherwise have stopped counting betas whose notes mention it).
+
 ## [0.3.0] - 2026-07-30
 
 ### Fixed

@@ -89,7 +89,10 @@ version's section, then to a generic pointer).
 
 **Marking a bad beta:** edit the beta's GitHub release and put `[failed]` in
 its title or notes (or delete the release). It then no longer counts towards
-promotion, and beta-channel panels skip it.
+promotion, and beta-channel panels skip it. Write the marker as plain text —
+inside a code span (like everywhere on this page) it counts as documentation,
+not as a verdict, so the CHANGELOG can explain the convention without marking
+the release that ships those notes as broken.
 
 ### Stable releases
 

@@ -222,7 +222,8 @@ Both settings persist across restarts and updates (in
 `/etc/prntbtlr/updater.json`). The panel checks GitHub every 6 hours
 (`PRNTBTLR_UPDATE_CHECK_INTERVAL` in seconds, `0` disables the background
 check; **Check for updates now** always works) and picks the newest release on
-your channel — a release marked `[failed]` (in its title or notes) is skipped.
+your channel — a release marked `[failed]` (as plain text in its title or
+notes) is skipped.
 
 **What installing does.** For the chosen tag the panel runs its self-updater
 ([`scripts/update.sh`](scripts/update.sh)): it downloads that release's

@@ -79,6 +79,20 @@ def test_failed_and_draft_releases_are_skipped():
     assert updater.pick_latest(releases, "stable") is None
 
 
+def test_marker_inside_a_code_span_does_not_fail_a_release():
+    # Release notes are generated from the CHANGELOG, which documents the
+    # convention itself — that must not read as "this release is broken".
+    notes = (
+        "### Added\n"
+        "- A beta is excluded by putting `[failed]` in its release title/notes.\n"
+        "\n### Container image\n"
+        "```\ndocker pull ghcr.io/w0rkingchr1s/prntbtlr:0.3.0  # [failed]\n```\n"
+    )
+    releases = [_release("v0.3.0", body=notes), _release("v0.2.9")]
+    assert updater.pick_latest(releases, "stable").tag == "v0.3.0"
+    assert updater.pick_latest(releases, "beta").tag == "v0.3.0"
+
+
 # --------------------------------------------------------------------------- #
 # Preferences & state
 # --------------------------------------------------------------------------- #
