@@ -16,6 +16,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   but the intentional idle one doesn't.
 
 ### Added
+- **Outbound webhooks.** A new *Webhooks* card on the System page POSTs a JSON
+  payload to any URL when things happen — `scan.completed`, `printer.added` /
+  `printer.deleted`, `print.submitted`, `health.degraded` / `health.recovered`,
+  `repair.performed`, and `update.available` / `update.applied` — so the panel
+  can drive n8n, Home Assistant, chat relays or a custom script. Each endpoint
+  subscribes to the events it wants and can carry a secret that signs the body
+  with HMAC-SHA256 (`X-Prntbtlr-Signature: sha256=…`); a **Test** button sends a
+  sample event. Deliveries run on a background thread pool (standard-library
+  `urllib`, no new dependency) so a slow or offline endpoint never blocks the
+  action that triggered it, and a **health monitor** loop fires the
+  degrade/recover events on transitions (idle unless something subscribes).
+  Endpoints persist in `/etc/prntbtlr/webhooks.json`
+  (`PRNTBTLR_WEBHOOK_STATE_FILE`); per-delivery timeout `PRNTBTLR_WEBHOOK_TIMEOUT`
+  (10 s). New `app/services/webhooks.py`, `app/routes/webhooks.py` and the
+  `/system/webhooks/*` routes.
 - **Switch top-level functions on and off.** A new *Functions* card on the
   System page lets you turn the panel's main functions — Printers, Scanning,
   Self-updates — on or off. A switched-off function disappears from the

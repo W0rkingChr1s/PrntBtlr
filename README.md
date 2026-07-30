@@ -40,7 +40,7 @@ Press the scan button → a PDF lands in a network folder (`/srv/scans`, shared 
 <td width="33%" valign="top">
 
 ### ⚙️ Manage
-Add/remove printers, watch & clear the queue, pause/resume, set the error policy, control services — all from one panel. Switch whole functions on/off and initialize the scanner during setup.
+Add/remove printers, watch & clear the queue, pause/resume, set the error policy, control services — all from one panel. Switch whole functions on/off, initialize the scanner during setup, and fire webhooks into your automations on scan/print/health/update events.
 
 </td>
 </tr>
@@ -346,6 +346,34 @@ its own every few minutes. The whole report is also in `/healthz` under a
 `health` object, so monitoring like PRTG can alert on it. For a ready-made PRTG
 setup (and other tools), see **[docs/monitoring.md](docs/monitoring.md)** —
 `/healthz?format=prtg` returns PRTG's native HTTP Data Advanced JSON directly.
+
+### Webhooks
+
+The **System** page can POST a small JSON payload to any URL when something
+happens — glue for wiring PrntBtlr into n8n, Home Assistant, a Discord/Slack
+relay, or your own script. Add an endpoint, tick the events it should receive,
+and (optionally) set a secret; deliveries run in the background, so a slow or
+offline endpoint never holds up the panel. **Test** sends a sample event so you
+can confirm the wiring before relying on it.
+
+Events you can subscribe to:
+
+| Event | Fires when |
+| --- | --- |
+| `scan.completed` | a browser scan finishes (payload has the file name) |
+| `printer.added` / `printer.deleted` | a queue is created / removed |
+| `print.submitted` | a test page is sent to a printer |
+| `health.degraded` / `health.recovered` | overall health crosses into warning/failure, or back to ok |
+| `repair.performed` | self-repair took action (payload lists what it did) |
+| `update.available` / `update.applied` | a new release is found / an update is started |
+
+Each request carries `X-Prntbtlr-Event` and `X-Prntbtlr-Delivery` headers plus a
+JSON body: `{"event", "timestamp", "app", "version", "host", "data": {…}}`. When
+a secret is set, the body is signed with HMAC-SHA256 in
+`X-Prntbtlr-Signature: sha256=…` so the receiver can verify authenticity (HTTP
+header names are case-insensitive). Endpoints persist in
+`/etc/prntbtlr/webhooks.json`; the per-delivery timeout is
+`PRNTBTLR_WEBHOOK_TIMEOUT` (10 s).
 
 ### Authentication (optional)
 

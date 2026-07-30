@@ -18,7 +18,8 @@ from .auth import auth_is_usable
 from .config import settings
 from .routes import auth as auth_routes
 from .routes import dashboard, printers, scans, system_routes
-from .services import features, health, repair, system, updater
+from .routes import webhooks as webhook_routes
+from .services import features, health, repair, system, updater, webhooks
 from .templating import redirect
 
 log = logging.getLogger("prntbtlr")
@@ -39,6 +40,9 @@ async def lifespan(_app: FastAPI):
             "self-repair: background sweeps enabled (every %ss)", settings.self_repair_interval
         )
         tasks.append(asyncio.create_task(repair.background_loop()))
+    # Watches overall health and fires health.degraded / health.recovered
+    # webhooks on a transition; it idles cheaply unless an endpoint subscribes.
+    tasks.append(asyncio.create_task(webhooks.background_loop()))
     yield
     for task in tasks:
         task.cancel()
@@ -114,6 +118,7 @@ app.include_router(dashboard.router)
 app.include_router(printers.router)
 app.include_router(scans.router)
 app.include_router(system_routes.router)
+app.include_router(webhook_routes.router)
 
 
 def _prtg_payload(svc, report: health.HealthReport) -> dict:

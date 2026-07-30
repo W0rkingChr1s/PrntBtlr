@@ -6,7 +6,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import FileResponse
 
 from ..config import settings
-from ..services import scan
+from ..services import scan, webhooks
 from ..templating import redirect, render
 
 router = APIRouter(prefix="/scans")
@@ -43,7 +43,7 @@ def new_scan(
     paper: str = Form(""),
     ocr: bool = Form(False),
 ):
-    ok, message, _ = scan.scan_now(
+    ok, message, path = scan.scan_now(
         device=device or None,
         source=source,
         mode=mode,
@@ -51,6 +51,11 @@ def new_scan(
         paper=paper or None,
         ocr=ocr,
     )
+    if ok and path is not None:
+        webhooks.emit(
+            "scan.completed",
+            {"file": path.name, "mode": mode, "resolution": resolution, "source": source},
+        )
     return redirect("/scans", message, "success" if ok else "error")
 
 

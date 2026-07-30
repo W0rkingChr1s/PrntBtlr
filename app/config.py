@@ -98,6 +98,20 @@ class Settings(BaseSettings):
     # a tiny JSON state file so they survive restarts and updates.
     feature_state_file: Path = Path("/etc/prntbtlr/features.json")
 
+    # --- Webhooks ---------------------------------------------------------
+    # Outbound webhooks: the panel POSTs a JSON payload to user-configured URLs
+    # when events happen (scan finished, printer added, health changed, update
+    # available/applied, ...). Endpoints are managed on the System page and live
+    # in a small JSON state file, same pattern as the features/updater state.
+    webhook_state_file: Path = Path("/etc/prntbtlr/webhooks.json")
+    # Per-delivery HTTP timeout (seconds); a slow endpoint can't stall the app
+    # since deliveries run off the request thread.
+    webhook_timeout: int = 10
+    # Seconds between background health sweeps that drive the health.degraded /
+    # health.recovered events. Only runs while at least one enabled webhook is
+    # subscribed to a health event, so idle installs do no extra work.
+    webhook_health_interval: int = 60
+
     # --- Scanner initialization -------------------------------------------
     # Detected scanner capabilities (available modes/sources/resolutions) from
     # the "Initialize scanner" step on the Add-printer page, cached here so the

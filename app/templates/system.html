@@ -142,6 +142,73 @@
 {% endif %}
 </div>
 
+<div class="card gap" id="webhooks">
+  <h2>Webhooks</h2>
+  <p class="muted">POST a JSON payload to a URL when something happens — wire the
+    panel into n8n, Home Assistant, a chat relay or any HTTP endpoint. Deliveries
+    run in the background, so a slow or offline endpoint never holds up the panel.
+    An optional secret signs each request
+    (<span class="mono">X-Prntbtlr-Signature: sha256=…</span>).</p>
+
+  {% if webhook_list %}
+  <table>
+    <thead><tr><th>Endpoint</th><th>Events</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for h in webhook_list %}
+      <tr>
+        <td class="mono">{{ h.url }}</td>
+        <td class="muted">{{ h.event_labels() | join(', ') }}</td>
+        <td>
+          {% if h.enabled %}<span class="badge ok">enabled</span>
+          {% else %}<span class="badge plain">disabled</span>{% endif %}
+        </td>
+        <td style="text-align:right">
+          <form class="inline" method="post" action="/system/webhooks/{{ h.id }}/test">
+            <button class="btn sm" type="submit">Test</button></form>
+          <form class="inline" method="post" action="/system/webhooks/{{ h.id }}/toggle">
+            <input type="hidden" name="enabled" value="{{ 'false' if h.enabled else 'true' }}">
+            <button class="btn sm ghost" type="submit">{{ 'Disable' if h.enabled else 'Enable' }}</button></form>
+          <form class="inline" method="post" action="/system/webhooks/{{ h.id }}/delete"
+                onsubmit="return confirm('Remove this webhook?');">
+            <button class="btn sm" type="submit">Delete</button></form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No webhooks yet — add one below.</p>
+  {% endif %}
+
+  <form method="post" action="/system/webhooks/add" class="gap">
+    <div class="field-row">
+      <label>Payload URL
+        <input type="url" name="url" placeholder="https://example.com/hook" required
+               style="width:100%">
+      </label>
+    </div>
+    <div class="field-row gap">
+      <label>Secret <span class="muted">— optional, signs each request</span>
+        <input type="text" name="secret" placeholder="(none)" style="width:100%">
+      </label>
+    </div>
+    <fieldset class="gap">
+      <legend class="muted">Send on these events</legend>
+      {% for group, events in webhook_event_groups.items() %}
+      <div class="gap"><strong>{{ group }}</strong>
+        {% for e in events %}
+        <label class="check"><input type="checkbox" name="{{ e.key }}" value="true">
+          {{ e.label }}</label>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </fieldset>
+    <div class="btn-row gap">
+      <button class="btn sm primary" type="submit">Add webhook</button>
+    </div>
+  </form>
+</div>
+
 <div class="card gap">
   <h2>Useful links</h2>
   <div class="btn-row">
