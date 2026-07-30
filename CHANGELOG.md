@@ -7,6 +7,37 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **A bootstrap install reported version 0.1.0.** `bootstrap.sh` clones the
+  default branch and runs the installer, which deployed the tree as-is — and
+  `app/__init__.py` had said `0.1.0` since the very first commit, because
+  nothing ever wrote the version back into the repo. Only `update.sh` stamped
+  it (from the release tag it downloads), so a panel installed with the
+  documented one-liner claimed `0.1.0` through the whole 0.2.x/0.3.x series,
+  and the updater — which compares that value against the release tags — then
+  offered every release forever, including the one already installed. The
+  version now has a single writer, `scripts/stamp-version.sh`:
+  - **Cut release** stamps the new version and commits it to the branch it
+    releases before tagging, so every tag ships a tree that states its own
+    version (and so does the container image built from it).
+  - **Promote beta to stable** restamps the promoted beta with the stable
+    version — `0.4.0`, not `0.4.0-beta.4` — and tags that, so a promoted
+    release no longer reports itself as a pre-release. Same code as the tested
+    beta; only the stamp differs. The default branch is fast-forwarded onto it
+    when it still points at the beta.
+  - **Release** stamps its build tree as well, so a tag pushed by hand can't
+    publish a stale image either.
+  - `install.sh` derives the stamp from the checkout — the exact release when
+    it sits on a tag, otherwise `<last tag>+dev.<n>.g<sha>` so the panel is
+    honest about running unreleased code. It stamps the deployed copy, never
+    the source checkout. `PRNTBTLR_VERSION` overrides it.
+  A `+dev` build suffix sorts as its base version, so such a box is offered
+  genuinely newer releases but not the one it is already past. `bootstrap.sh`
+  clones with full history and tags (the repo is a couple of megabytes either
+  way) because `git describe` can't place HEAD without them.
+
+## [0.3.1] - 2026-07-30
+
+### Fixed
 - **The updater skipped v0.3.0 and reported "You are up to date".** A release
   is ignored when it's marked bad with `[failed]`, but that check was a plain
   substring search over the release title *and* notes — and the notes are

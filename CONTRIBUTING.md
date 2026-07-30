@@ -113,10 +113,32 @@ git tag v0.2.0 && git push origin v0.2.0
 ```
 
 Before (or right after) a stable release, move the `## [Unreleased]` notes in
-[`CHANGELOG.md`](CHANGELOG.md) under a `## [x.y.z] - YYYY-MM-DD` heading and
-bump `version` in `pyproject.toml` / `app/__init__.py`. (The self-updater
-stamps the installed version from the release tag, so a missed bump doesn't
-break updates — but keeping them in sync keeps the repo honest.)
+[`CHANGELOG.md`](CHANGELOG.md) under a `## [x.y.z] - YYYY-MM-DD` heading.
+
+### The version stamp
+
+`app/__init__.py` and `pyproject.toml` are **not** bumped by hand — the release
+workflows do it via [`scripts/stamp-version.sh`](scripts/stamp-version.sh), the
+single writer of the version:
+
+- **Cut release** stamps the new version and commits it to the branch it
+  releases *before* tagging, so the tag ships a tree that states its own
+  version.
+- **Promote beta to stable** restamps the promoted beta's commit with the stable
+  version (`0.4.0` instead of `0.4.0-beta.4`) and tags that — same code, honest
+  version — and fast-forwards the default branch onto it when it still points at
+  the beta.
+- **Release** stamps its build tree too, so a tag pushed by hand still produces
+  a correct image.
+- `install.sh` derives the stamp from the checkout: exactly on a tag → that
+  release; ahead of it → `<last tag>+dev.<n>.g<sha>`, which the updater treats
+  as the base version, so an unreleased box is offered later releases but not
+  the one it is already past.
+
+The panel displays this value and the self-updater compares it against the
+release tags, so a stale stamp is a real bug, not cosmetics: installs from the
+default branch reported `0.1.0` for the whole 0.2.x/0.3.x series and were
+offered every release forever, including the one they were running.
 
 ## Reporting bugs / requesting features
 

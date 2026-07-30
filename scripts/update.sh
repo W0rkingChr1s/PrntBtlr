@@ -37,12 +37,22 @@ mkdir "$TMP/src"
 tar -xzf "$TMP/src.tar.gz" -C "$TMP/src" --strip-components=1
 
 # Stamp the release version so the panel knows exactly what is installed
-# (the updater compares this against GitHub release tags).
+# (the updater compares this against GitHub release tags). Releases from before
+# the stamper existed don't ship it — fall back to writing __init__.py directly,
+# so installing (or rolling back to) an older tag still works.
 VERSION="${TAG#v}"
-sed -i "s/^__version__ = .*/__version__ = \"$VERSION\"/" "$TMP/src/app/__init__.py"
+if [ -f "$TMP/src/scripts/stamp-version.sh" ]; then
+  bash "$TMP/src/scripts/stamp-version.sh" "$VERSION" "$TMP/src"
+else
+  sed -i "s/^__version__ = .*/__version__ = \"$VERSION\"/" "$TMP/src/app/__init__.py"
+  echo "Stamped version $VERSION (legacy tarball, no stamp-version.sh)"
+fi
 
 # The installer is idempotent and doubles as the upgrade path; it redeploys
-# /opt/prntbtlr, restarts the service and health-checks the panel.
-SKIP_APT="${SKIP_APT:-1}" NO_FIREWALL="${NO_FIREWALL:-1}" bash "$TMP/src/scripts/install.sh"
+# /opt/prntbtlr, restarts the service and health-checks the panel. It derives the
+# version stamp from git when it finds a checkout, so pass the release version
+# explicitly — the tarball is authoritative here, whatever it was unpacked into.
+SKIP_APT="${SKIP_APT:-1}" NO_FIREWALL="${NO_FIREWALL:-1}" PRNTBTLR_VERSION="$VERSION" \
+  bash "$TMP/src/scripts/install.sh"
 
 echo "=== PrntBtlr update to $TAG finished ==="

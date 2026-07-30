@@ -66,6 +66,50 @@ die()  { echo "${c_red}  ✗ $*${c_off}" >&2; exit 1; }
 
 backup() { [ -f "$1" ] && cp -a "$1" "$1.bak.$(TS)" && ok "backed up $1"; }
 
+# Version of the code we are about to deploy, or empty to keep whatever the
+# source tree already carries.
+#
+# Release tarballs (scripts/update.sh) arrive pre-stamped, so they say empty. A
+# git checkout is the case that used to lie: bootstrap.sh clones the default
+# branch and the panel then reported whatever was committed — 0.1.0 for the
+# whole 0.2.x/0.3.x series. Derive it from the tags instead:
+#   - sitting exactly on a release tag  → that release
+#   - ahead of the last tag             → that tag + a `+dev` build suffix, so
+#                                         the panel is honest about running
+#                                         unreleased code (the updater ignores
+#                                         the suffix when comparing)
+resolve_deploy_version() {
+  if [ -n "${PRNTBTLR_VERSION:-}" ]; then
+    echo "$PRNTBTLR_VERSION"
+    return 0
+  fi
+  git -C "$REPO_DIR" rev-parse --git-dir >/dev/null 2>&1 || return 0
+
+  local exact last count sha
+  exact="$(git -C "$REPO_DIR" describe --tags --exact-match 2>/dev/null || true)"
+  if [ -z "$exact" ]; then
+    # describe needs history; --points-at only needs the refs, so this still
+    # places HEAD in a shallow checkout that sits exactly on a release tag.
+    exact="$(git -C "$REPO_DIR" tag --points-at HEAD 2>/dev/null \
+      | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$' | sort -V | tail -1 || true)"
+  fi
+  if [ -n "$exact" ]; then
+    echo "${exact#v}"
+    return 0
+  fi
+
+  last="$(git -C "$REPO_DIR" describe --tags --abbrev=0 2>/dev/null || true)"
+  sha="$(git -C "$REPO_DIR" rev-parse --short=7 HEAD 2>/dev/null || true)"
+  # A shallow clone without tags can't be placed — keep the committed stamp.
+  [ -n "$last" ] && [ -n "$sha" ] || return 0
+  count="$(git -C "$REPO_DIR" rev-list --count "$last..HEAD" 2>/dev/null || echo 0)"
+  echo "${last#v}+dev.$count.g$sha"
+}
+
+stamped_version() {
+  sed -n 's/^__version__ = "\(.*\)"$/\1/p' "$1/app/__init__.py" 2>/dev/null | head -1
+}
+
 on_error() {
   local line=$1
   echo >&2
@@ -364,6 +408,16 @@ cp -a "$REPO_DIR/app" "$APP_DIR/"
 cp -a "$REPO_DIR/requirements.txt" "$REPO_DIR/pyproject.toml" "$APP_DIR/" 2>/dev/null || true
 # Self-updater (System → Updates pulls release tarballs and re-runs install.sh).
 install -m 0755 "$REPO_DIR/scripts/update.sh" "$APP_DIR/update.sh"
+
+# Stamp the version into the *deployed* copy — never into $REPO_DIR, which may
+# be a checkout the user (or bootstrap.sh) reuses and expects to stay clean.
+DEPLOY_VERSION="$(resolve_deploy_version)"
+if [ -n "$DEPLOY_VERSION" ]; then
+  bash "$REPO_DIR/scripts/stamp-version.sh" "$DEPLOY_VERSION" "$APP_DIR" >/dev/null
+  ok "Version: $DEPLOY_VERSION (derived from the checkout)"
+else
+  ok "Version: $(stamped_version "$APP_DIR") (as shipped in the source tree)"
+fi
 
 if [ ! -d "$APP_DIR/.venv" ]; then
   python3 -m venv "$APP_DIR/.venv"

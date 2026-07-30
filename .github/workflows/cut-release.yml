@@ -14,6 +14,14 @@ name: Cut release
 # without their stable release yet) is continued with the next -beta.N;
 # otherwise the last release is bumped (minor by default). Set the "version"
 # input to override, e.g. 0.3.0.
+#
+# Before tagging, the version is stamped into the source and committed to the
+# branch being released, so the tree always states the version it ships as. The
+# panel shows that value and the self-updater compares it against release tags —
+# an unstamped tree makes every install claim the version of the last commit
+# that happened to touch it (installs from the default branch reported 0.1.0
+# through the whole 0.2.x/0.3.x series). Needs push access to the branch; if it
+# is protected against the Actions token, allow it or cut releases by hand.
 
 on:
   workflow_dispatch:
@@ -103,12 +111,30 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "Next $CHANNEL release: $tag"
 
+      - name: Stamp the version into the source tree
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+        run: |
+          set -euo pipefail
+          bash scripts/stamp-version.sh "${TAG#v}"
+          if git diff --quiet -- app/__init__.py pyproject.toml; then
+            echo "::notice::Source already states ${TAG#v} — nothing to commit."
+          else
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "release: stamp version ${TAG#v}" -- app/__init__.py pyproject.toml
+            # Fails (loudly) if someone pushed meanwhile — rerun the workflow.
+            git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+            echo "::notice::Committed the version stamp to $GITHUB_REF_NAME."
+          fi
+
       - name: Tag and run the Release workflow
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.next.outputs.tag }}
         run: |
           set -euo pipefail
+          # Tags the stamp commit, so the release ships its own version.
           git tag "$TAG"
           git push origin "refs/tags/$TAG"
           # A tag pushed with GITHUB_TOKEN doesn't fire release.yml's tag
