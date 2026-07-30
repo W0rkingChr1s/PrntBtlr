@@ -36,6 +36,7 @@ from urllib.parse import urlparse
 
 from .. import __version__
 from ..config import settings
+from . import statefile
 
 log = logging.getLogger("prntbtlr.webhooks")
 
@@ -127,8 +128,6 @@ def _load() -> list[Webhook]:
 
 
 def _save(hooks: list[Webhook]) -> None:
-    path = settings.webhook_state_file
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "endpoints": [
             {
@@ -141,9 +140,8 @@ def _save(hooks: list[Webhook]) -> None:
             for h in hooks
         ]
     }
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(payload, indent=2))
-    tmp.replace(path)
+    # Owner-only: the state carries the HMAC signing secrets.
+    statefile.save_json(settings.webhook_state_file, payload)
 
 
 def _new_id() -> str:

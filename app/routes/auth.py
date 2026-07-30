@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
 
-from ..auth import check_credentials
+from ..auth import check_credentials, throttle
 from ..config import settings
 from ..templating import render
 
@@ -38,9 +38,22 @@ def login_submit(
     password: str = Form(...),
     next: str = Form("/"),
 ):
+    client = request.client.host if request.client else "unknown"
+    wait = throttle.retry_after(client)
+    if wait:
+        # Blocked clients don't even get their credentials checked.
+        return render(
+            request,
+            "login.html",
+            next=_safe_next(next),
+            error=f"Too many failed attempts — try again in {wait}s.",
+            hide_nav=True,
+        )
     if check_credentials(username.strip(), password):
+        throttle.note_success(client)
         request.session["user"] = username.strip()
         return RedirectResponse(_safe_next(next), status_code=303)
+    throttle.note_failure(client)
     return render(
         request,
         "login.html",

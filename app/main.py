@@ -7,10 +7,10 @@ import logging
 import secrets
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -76,6 +76,37 @@ async def feature_gate(request: Request, call_next):
         if path.startswith(prefix) and not features.is_enabled(key):
             name = next((f.label for f in features.FEATURES if f.key == key), key)
             return redirect("/", f"{name} is switched off. Enable it on the System page.", "info")
+    return await call_next(request)
+
+
+def _same_origin(value: str, host: str) -> bool:
+    """True when *value* (an Origin or Referer header) targets *host*.
+
+    An unparsable value or the literal ``Origin: null`` (sandboxed iframes —
+    a classic CSRF vehicle) yields an empty netloc and is treated as foreign.
+    """
+    try:
+        netloc = urlparse(value).netloc
+    except ValueError:
+        return False
+    return bool(netloc) and netloc.lower() == host.lower()
+
+
+@app.middleware("http")
+async def csrf_origin_check(request: Request, call_next):
+    """Reject state-changing requests that arrive from a foreign origin.
+
+    Every mutation in the panel is a browser form POST, and browsers send an
+    ``Origin`` (or at least ``Referer``) header on those — so a POST bearing a
+    header that doesn't match our own host is a cross-site request (CSRF) and
+    is refused. Requests without either header (curl, scripts, monitoring)
+    pass through: they aren't riding a victim's browser, which is the attack
+    this check exists to stop.
+    """
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        source = request.headers.get("origin") or request.headers.get("referer")
+        if source is not None and not _same_origin(source, request.headers.get("host", "")):
+            return PlainTextResponse("Cross-origin request rejected.", status_code=403)
     return await call_next(request)
 
 

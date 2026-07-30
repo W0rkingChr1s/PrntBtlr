@@ -18,7 +18,7 @@ import logging
 from dataclasses import dataclass
 
 from ..config import settings
-from . import system
+from . import statefile, system
 
 log = logging.getLogger("prntbtlr.features")
 
@@ -92,11 +92,7 @@ def _load_state() -> dict:
 
 
 def _save_state(state: dict) -> None:
-    path = settings.feature_state_file
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(state, indent=2))
-    tmp.replace(path)
+    statefile.save_json(settings.feature_state_file, state)
 
 
 # --------------------------------------------------------------------------- #
