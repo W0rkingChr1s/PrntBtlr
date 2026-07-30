@@ -134,12 +134,21 @@ def _prtg_payload(svc, report: health.HealthReport) -> dict:
     matching limits, so a warning check goes yellow and a failed one goes red.
     """
     active = sum(1 for s in svc if s.active)
+    # Services owned by a switched-off function are stopped on purpose, so they
+    # must not count towards the number we expect to be running.
+    off_units = {
+        svc_name
+        for key in ("printers", "scans")
+        if not features.is_enabled(key)
+        for svc_name in features.services_for(key)
+    }
+    countable = [s for s in svc if s.name not in off_units]
     # The scan-button pair (scanbd / prntbtlr-scan-listen) shares one USB
     # scanner, so exactly one of them runs and the other is idle by design.
     # A healthy host therefore never has *all* units active — expect one fewer
     # per extra scan-button unit so this channel doesn't cry wolf on every box.
-    scan_button_units = sum(1 for s in svc if s.name in health.SCAN_BUTTON_SERVICES)
-    expected_active = len(svc) - max(0, scan_button_units - 1)
+    scan_button_units = sum(1 for s in countable if s.name in health.SCAN_BUTTON_SERVICES)
+    expected_active = len(countable) - max(0, scan_button_units - 1)
     # ok/skip -> 2 (green), warn -> 1 (yellow), fail -> 0 (red).
     scale = {health.OK: 2, health.SKIP: 2, health.WARN: 1, health.FAIL: 0}
     results = [
