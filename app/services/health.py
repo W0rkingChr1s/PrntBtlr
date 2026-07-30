@@ -25,7 +25,12 @@ import shutil
 from dataclasses import dataclass, field
 
 from ..config import settings
-from . import cups, scan, shell, system
+from . import cups, features, scan, shell, system
+
+# Shown when a check is skipped because the function it belongs to is switched
+# off on the System page — its service is stopped on purpose, so an idle unit is
+# expected, not a fault.
+_FUNCTION_OFF = "Its function is switched off (System → Functions)."
 
 # Status vocabulary shared with the templates and the /healthz payload.
 OK = "ok"  # working
@@ -109,7 +114,9 @@ def check_network() -> Check:
     )
 
 
-def check_cups() -> Check:
+def check_cups(printers_on: bool = True) -> Check:
+    if not printers_on:
+        return Check("cups", "CUPS print system", SKIP, _FUNCTION_OFF)
     if not cups.available():
         return Check("cups", "CUPS print system", SKIP, "CUPS (lpstat) is not installed.")
     if cups.scheduler_running():
@@ -123,14 +130,28 @@ def check_cups() -> Check:
     )
 
 
-def _core_service_checks() -> list[Check]:
-    """One check per required service, minus the scan-button pair."""
-    names = [n for n in settings.services if n not in SCAN_BUTTON_SERVICES]
-    states = shell.gather([lambda n=n: system.service_state(n) for n in names])
+def _core_service_checks(off_services: frozenset[str] = frozenset()) -> list[Check]:
+    """One check per required service, minus the scan-button pair.
+
+    Services in *off_services* belong to a switched-off function; their unit is
+    stopped on purpose, so they're reported as ``skip`` rather than failed (and
+    aren't even queried). The remaining service states are fetched concurrently,
+    since each ``systemctl`` call blocks on its own.
+    """
+    names = [
+        n for n in settings.services if n not in SCAN_BUTTON_SERVICES and n not in off_services
+    ]
+    states = dict(zip(names, shell.gather([lambda n=n: system.service_state(n) for n in names])))
     checks: list[Check] = []
-    for name, st in zip(names, states):
+    for name in settings.services:
+        if name in SCAN_BUTTON_SERVICES:
+            continue
         key = f"service:{name}"
         title = f"Service {name}"
+        if name in off_services:
+            checks.append(Check(key, title, SKIP, _FUNCTION_OFF))
+            continue
+        st = states[name]
         if st.status in ("not-installed", "unknown"):
             reason = (
                 "Not installed on this host."
@@ -188,10 +209,12 @@ def scan_button_target(states: list[system.ServiceState] | None = None) -> str |
     return None
 
 
-def check_scan_button() -> Check:
+def check_scan_button(scans_on: bool = True) -> Check:
     """At least one scan-button handler up (browser scanning works regardless)."""
     key = "scanbutton"
     title = "Scan button"
+    if not scans_on:
+        return Check(key, title, SKIP, _FUNCTION_OFF)
     states = _scan_button_states()
     installed = [s for s in states if s.status not in ("not-installed", "unknown")]
     if not installed:
@@ -238,7 +261,9 @@ def _usb_detected(printer: cups.Printer, usb_uris: list[str]) -> bool:
     return any(u.split("?", 1)[0].lower() == base for u in usb_uris)
 
 
-def check_printers() -> list[Check]:
+def check_printers(printers_on: bool = True) -> list[Check]:
+    if not printers_on:
+        return [Check("printer", "Printer configured", SKIP, _FUNCTION_OFF)]
     if not cups.available():
         return [Check("printer", "Printer", SKIP, "CUPS is not installed.")]
 
@@ -288,7 +313,9 @@ def check_printers() -> list[Check]:
     return checks
 
 
-def check_scanner() -> Check:
+def check_scanner(scans_on: bool = True) -> Check:
+    if not scans_on:
+        return Check("scanner", "Scanner", SKIP, _FUNCTION_OFF)
     if not scan.available():
         return Check("scanner", "Scanner", SKIP, "SANE (scanimage) is not installed.")
     devices = scan.list_devices()
@@ -305,7 +332,9 @@ def check_scanner() -> Check:
     )
 
 
-def check_sharing() -> Check:
+def check_sharing(printers_on: bool = True) -> Check:
+    if not printers_on:
+        return Check("sharing", "AirPrint sharing", SKIP, _FUNCTION_OFF)
     if not cups.available():
         return Check("sharing", "AirPrint sharing", SKIP, "CUPS is not installed.")
     if not cups.list_printers():
@@ -324,7 +353,9 @@ def check_sharing() -> Check:
     )
 
 
-def check_storage() -> Check:
+def check_storage(scans_on: bool = True) -> Check:
+    if not scans_on:
+        return Check("storage", "Scan storage", SKIP, _FUNCTION_OFF)
     directory = settings.scan_dir
     if not directory.exists():
         return Check(
@@ -361,17 +392,30 @@ def run_checks() -> HealthReport:
     concurrently means the report takes about as long as its slowest single
     check instead of the sum of all of them. Results are reassembled in a fixed
     order so the page layout never shuffles.
+
+    Switched-off functions (System → Functions) have their services stopped on
+    purpose, so the checks they own are reported as ``skip`` rather than failed —
+    otherwise a print-only or scan-only box would cry wolf over an idle unit.
     """
+    printers_on = features.is_enabled("printers")
+    scans_on = features.is_enabled("scans")
+    off_services: frozenset[str] = frozenset(
+        svc
+        for key, on in (("printers", printers_on), ("scans", scans_on))
+        if not on
+        for svc in features.services_for(key)
+    )
+
     groups = shell.gather(
         [
             lambda: [check_network()],
-            _core_service_checks,
-            lambda: [check_cups()],
-            check_printers,
-            lambda: [check_scan_button()],
-            lambda: [check_scanner()],
-            lambda: [check_sharing()],
-            lambda: [check_storage()],
+            lambda: _core_service_checks(off_services),
+            lambda: [check_cups(printers_on)],
+            lambda: check_printers(printers_on),
+            lambda: [check_scan_button(scans_on)],
+            lambda: [check_scanner(scans_on)],
+            lambda: [check_sharing(printers_on)],
+            lambda: [check_storage(scans_on)],
         ]
     )
     checks: list[Check] = [check for group in groups for check in group]

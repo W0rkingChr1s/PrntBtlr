@@ -135,6 +135,30 @@ def test_prtg_services_active_allows_idle_scan_button():
     assert ch["value"] < ch["limitminerror"]
 
 
+def test_prtg_services_active_ignores_off_function(monkeypatch):
+    # Printers switched off → cups is stopped on purpose. The channel must not
+    # count it as a required-but-missing service (regression from wiring the
+    # function toggles to systemd units).
+    from app import main as main_mod
+    from app.main import _prtg_payload
+    from app.services import health, system
+
+    monkeypatch.setattr(main_mod.features, "is_enabled", lambda key: key != "printers")
+    svc = [
+        system.ServiceState("cups", False, False, "inactive"),  # stopped by the toggle
+        system.ServiceState("scanbd", False, False, "inactive"),
+        system.ServiceState("prntbtlr-scan-listen", True, True, "active"),
+        system.ServiceState("smbd", True, True, "active"),
+        system.ServiceState("avahi-daemon", True, True, "active"),
+    ]
+    report = health.HealthReport([health.Check("scanbutton", "Scan button", health.OK)])
+    ch = next(
+        r for r in _prtg_payload(svc, report)["prtg"]["result"] if r["channel"] == "Services active"
+    )
+    # cups isn't counted, so the three expected units are all up → green.
+    assert ch["value"] >= ch["limitminerror"]
+
+
 def test_unknown_scan_download_redirects(client):
     r = client.get("/scans/file/nope.pdf", follow_redirects=False)
     assert r.status_code == 303

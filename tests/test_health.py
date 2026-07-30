@@ -164,6 +164,59 @@ def test_overall_is_worst_status():
     assert report.overall == health.FAIL
 
 
+def test_checks_skip_when_function_off():
+    # A switched-off function's checks report skip, never fail/warn.
+    assert health.check_cups(printers_on=False).status == health.SKIP
+    assert health.check_printers(printers_on=False)[0].status == health.SKIP
+    assert health.check_sharing(printers_on=False).status == health.SKIP
+    assert health.check_scan_button(scans_on=False).status == health.SKIP
+    assert health.check_scanner(scans_on=False).status == health.SKIP
+    assert health.check_storage(scans_on=False).status == health.SKIP
+
+
+def test_core_service_skips_off_function_unit(monkeypatch):
+    # cups belongs to the (switched-off) Printers function → skip, not fail,
+    # even though the unit is inactive.
+    monkeypatch.setattr(
+        health.system, "service_state", lambda name: _svc(name, active=False, status="inactive")
+    )
+    checks = {c.key: c for c in health._core_service_checks(frozenset({"cups"}))}
+    assert checks["service:cups"].status == health.SKIP
+    assert not checks["service:cups"].repairable
+    # An unrelated shared unit is still judged normally.
+    assert checks["service:smbd"].status == health.FAIL
+
+
+def test_run_checks_no_false_alarm_when_printers_off(monkeypatch):
+    # Printers off + cups stopped must NOT produce a failing report (regression:
+    # it used to show "Service cups" and "CUPS print system" as failed).
+    monkeypatch.setattr(health.features, "is_enabled", lambda key: key != "printers")
+    monkeypatch.setattr(health.system, "_primary_ip", lambda: "192.168.1.20")
+    monkeypatch.setattr(health.cups, "available", lambda: True)
+    monkeypatch.setattr(health.cups, "scheduler_running", lambda: False)  # cups stopped
+
+    def fake_state(name):
+        # cups stopped by the toggle; everything else healthy.
+        if name == "cups":
+            return _svc(name, active=False, status="inactive")
+        if name in health.SCAN_BUTTON_SERVICES:
+            return _svc(name, active=(name == "scanbd"))
+        return _svc(name, active=True)
+
+    monkeypatch.setattr(health.system, "service_state", fake_state)
+    monkeypatch.setattr(health.scan, "available", lambda: True)
+    monkeypatch.setattr(
+        health.scan, "list_devices", lambda: [health.scan.ScanDevice(device="pixma")]
+    )
+
+    report = health.run_checks()
+    keys = {c.key: c for c in report.checks}
+    assert keys["cups"].status == health.SKIP
+    assert keys["service:cups"].status == health.SKIP
+    assert report.count(health.FAIL) == 0
+    assert not report.repairable  # self-repair won't fight the toggle
+
+
 def test_run_checks_degrades_gracefully_without_tools(monkeypatch):
     # No CUPS, no SANE, no systemctl → nothing crashes, everything skips/reports.
     monkeypatch.setattr(health.cups, "available", lambda: False)

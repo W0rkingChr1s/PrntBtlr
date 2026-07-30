@@ -30,6 +30,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   action.
 
 ### Fixed
+- **Health no longer false-alarms over a switched-off function.** Turning a
+  function off stops its systemd units on purpose, but the *Health* card then
+  flagged them — e.g. disabling *Printers* showed *Service cups* and *CUPS print
+  system* as **failed**, and background self-repair would try to restart `cups`,
+  fighting the toggle. The control instances a disabled function owns
+  (`Service cups`, *CUPS print system*, *Printer configured*, *AirPrint
+  sharing*, and for Scanning the *Scan button*, *Scanner* and *Scan storage*)
+  now report **skip** instead, so an intentionally-idle unit isn't a fault and
+  self-repair leaves it alone. The PRTG *Services active* channel likewise stops
+  counting a disabled function's units as required.
+
 - **PRTG `Services active` channel no longer false-alarms.** The scan-button
   pair (`scanbd` / `prntbtlr-scan-listen`) shares one USB scanner, so exactly
   one runs and the other is idle by design — a healthy host has 4/5 units
