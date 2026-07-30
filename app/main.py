@@ -19,7 +19,7 @@ from .config import settings
 from .routes import auth as auth_routes
 from .routes import dashboard, printers, scans, system_routes
 from .routes import webhooks as webhook_routes
-from .services import features, health, repair, system, updater, webhooks
+from .services import features, health, jobmon, repair, system, updater, webhooks
 from .templating import redirect
 
 log = logging.getLogger("prntbtlr")
@@ -43,6 +43,9 @@ async def lifespan(_app: FastAPI):
     # Watches overall health and fires health.degraded / health.recovered
     # webhooks on a transition; it idles cheaply unless an endpoint subscribes.
     tasks.append(asyncio.create_task(webhooks.background_loop()))
+    # Polls CUPS and fires print.submitted / print.completed for real jobs;
+    # same idle-unless-subscribed gating.
+    tasks.append(asyncio.create_task(jobmon.background_loop()))
     yield
     for task in tasks:
         task.cancel()

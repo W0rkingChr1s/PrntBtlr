@@ -362,7 +362,7 @@ Events you can subscribe to:
 | --- | --- |
 | `scan.completed` | a scan finishes — from the browser **or** the hardware scan button (payload has the file name; button scans add `source: "button"` and the page count) |
 | `printer.added` / `printer.deleted` | a queue is created / removed |
-| `print.submitted` | a test page is sent to a printer |
+| `print.submitted` / `print.completed` | any real print job is queued / finishes — AirPrint, `lp`, or the panel's test page (payload has the CUPS job id, printer, user and size) |
 | `health.degraded` / `health.recovered` | overall health crosses into warning/failure, or back to ok |
 | `repair.performed` | self-repair took action (payload lists what it did) |
 | `update.available` / `update.applied` | a new release is found / an update is started |
@@ -380,6 +380,12 @@ webhook through the app's `python -m app.notify` helper once the PDF is
 published — best-effort and detached, so a slow endpoint never delays the next
 scan. It uses the app virtualenv at `/opt/prntbtlr` by default
 (`PRNTBTLR_PYTHON` / `PRNTBTLR_APP_DIR` override it).
+
+Print jobs likewise go straight to CUPS, not through the panel, so the
+`print.*` events come from a lightweight background monitor that polls `lpstat`
+(every `PRNTBTLR_WEBHOOK_JOBS_INTERVAL` seconds, default 15) and diffs the job
+list — no CUPS notifier or subscription to configure. Like the health monitor,
+it stays idle until an endpoint subscribes to a print event.
 
 ### Authentication (optional)
 

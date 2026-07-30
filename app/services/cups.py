@@ -234,8 +234,16 @@ def duplicate_device_serials(printers: list[Printer]) -> set[str]:
     return {serial for serial, n in counts.items() if n > 1}
 
 
-def list_jobs() -> list[Job]:
-    res = shell.run([settings.cups_lpstat, "-o"])
+def list_jobs(which: str = "") -> list[Job]:
+    """Queued jobs from ``lpstat -o``.
+
+    *which* maps to ``lpstat -W`` (``"completed"``, ``"not-completed"``,
+    ``"all"``); the default keeps the historical behaviour — active jobs only.
+    """
+    cmd = [settings.cups_lpstat, "-o"]
+    if which:
+        cmd = [settings.cups_lpstat, "-W", which, "-o"]
+    res = shell.run(cmd)
     jobs: list[Job] = []
     if not res.ok:
         return jobs
