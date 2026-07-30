@@ -55,7 +55,10 @@ def service_state(name: str) -> ServiceState:
 
 
 def services() -> list[ServiceState]:
-    return [service_state(name) for name in settings.services]
+    # Each service needs two independent ``systemctl`` shell-outs; querying the
+    # services concurrently turns ~2N sequential waits into ~2, which is the bulk
+    # of the dashboard's load time.
+    return shell.gather([lambda n=name: service_state(n) for name in settings.services])
 
 
 def restart_service(name: str) -> shell.Result:

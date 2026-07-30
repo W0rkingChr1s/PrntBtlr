@@ -9,11 +9,16 @@ from __future__ import annotations
 import logging
 import shutil
 import subprocess
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from typing import TypeVar
 
 from ..config import settings
 
 log = logging.getLogger("prntbtlr.shell")
+
+T = TypeVar("T")
 
 
 @dataclass
@@ -81,3 +86,26 @@ def run(
     if check and not result.ok:
         raise CommandError(result, cmd)
     return result
+
+
+def gather(tasks: list[Callable[[], T]], *, max_workers: int | None = None) -> list[T]:
+    """Run independent zero-argument callables concurrently, preserving order.
+
+    Most of a page's latency is spent waiting on blocking shell-outs
+    (``systemctl``, ``lpstat``, ``scanimage`` …) that don't depend on one
+    another. Fanning them across threads collapses N sequential waits into
+    roughly one — the win that matters on a Raspberry Pi, where each subprocess
+    spawn is tens of milliseconds. Results come back in the same order as
+    *tasks*; the first exception raised is re-raised to the caller.
+
+    A fresh, right-sized pool is created per call (thread creation is cheap next
+    to a subprocess spawn), so nested ``gather`` calls each get their own
+    workers and can't deadlock on a shared, saturated pool.
+    """
+    if not tasks:
+        return []
+    if len(tasks) == 1:
+        return [tasks[0]()]
+    workers = max_workers or min(len(tasks), 16)
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="prntbtlr") as pool:
+        return [future.result() for future in [pool.submit(task) for task in tasks]]
