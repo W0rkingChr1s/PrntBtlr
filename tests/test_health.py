@@ -214,7 +214,13 @@ def test_run_checks_no_false_alarm_when_printers_off(monkeypatch):
     assert keys["cups"].status == health.SKIP
     assert keys["service:cups"].status == health.SKIP
     assert report.count(health.FAIL) == 0
-    assert not report.repairable  # self-repair won't fight the toggle
+    # Nothing print-related is repairable, so self-repair won't fight the toggle.
+    # (Other checks like scan storage may still be repairable on a bare runner —
+    # that's unrelated to the Printers function being off.)
+    repair_keys = {c.key for c in report.repairable}
+    assert "cups" not in repair_keys
+    assert "service:cups" not in repair_keys
+    assert not any(k.startswith("printer") for k in repair_keys)
 
 
 def test_run_checks_degrades_gracefully_without_tools(monkeypatch):
