@@ -6,6 +6,53 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-30
+
+### Fixed
+- **Flash messages on `#fragment` redirects actually display now.** The
+  one-shot flash query used to be appended *after* the fragment
+  (`/system#health?msg=…`), which browsers treat as part of the fragment — so
+  the feedback for self-repair, function toggles and webhook actions silently
+  never showed. The query now goes before the fragment.
+- **Paused and actively-printing queues no longer vanish from the panel.**
+  `lpstat -p` prints three line shapes, and two of them carry no "is"
+  (`printer X now printing X-7.` / `printer X disabled since … -`). The parser
+  only matched idle queues, so a stopped printer disappeared from the Printers
+  page and the health checks — which meant self-repair could never resume it.
+  All three shapes are parsed now; a stopped queue shows as "paused" and is
+  repairable again.
+- **Background self-repair fires the `repair.performed` webhook**, like the
+  manual "Run self-repair" button always did.
+- **Logging in with non-ASCII characters no longer crashes with a 500.**
+  Credential comparison runs on bytes now, so umlauts in the login form (or in
+  configured credentials) fail or succeed cleanly instead of raising.
+- **Deep links survive the login round-trip.** The `next` target is
+  URL-encoded, so a query string on the original URL no longer splits into
+  separate `/login` parameters; `/\host` redirect targets (which browsers
+  normalize to the `//host` open redirect) are rejected too.
+
+### Security
+- **Cross-origin requests can't trigger panel actions anymore (CSRF).**
+  State-changing requests whose `Origin`/`Referer` points at a foreign host —
+  including the sandboxed-iframe `null` origin — are refused with 403. Plain
+  non-browser clients (curl, scripts, monitoring) are unaffected.
+- **The login form throttles brute-force guessing.** After 5 consecutive
+  failures a client waits 60 s before the next attempt is even checked; each
+  further failure restarts the clock, a successful login clears it.
+- **Webhook targets are checked against an SSRF blocklist.** URLs resolving to
+  the host itself (loopback), link-local space (cloud metadata addresses),
+  unspecified, multicast or reserved ranges are refused — when added *and*
+  again on every delivery, so DNS rebinding can't sneak one back in. Private
+  LAN receivers keep working.
+- **State files are owner-only.** The JSON state (webhooks incl. their HMAC
+  signing secrets, features, updater, scan caps) is written atomically with
+  mode `0600`; a pre-existing world-readable file is tightened on next save.
+- **Both systemd units run sandboxed.** Read-only filesystem outside
+  `/etc/prntbtlr` and the scan folder (`ProtectSystem=strict`), plus
+  `NoNewPrivileges`, `PrivateTmp`, `ProtectHome`, kernel/namespace/realtime
+  restrictions and pinned address families. Raw USB scanning and self-updates
+  keep working (updates run as a transient unit outside the sandbox).
+
 ### Changed
 - **Pages load noticeably faster.** The dashboard, printers list and System
   health panel each fired off many blocking shell-outs (`systemctl`, `lpstat`,
@@ -288,5 +335,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Test suite covering CUPS/scan parsers, the path-traversal guard, and page
   rendering.
 
-[Unreleased]: https://github.com/w0rkingchr1s/prntbtlr/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/w0rkingchr1s/prntbtlr/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/w0rkingchr1s/prntbtlr/compare/v0.1.0...v0.3.0
 [0.1.0]: https://github.com/w0rkingchr1s/prntbtlr/releases/tag/v0.1.0
