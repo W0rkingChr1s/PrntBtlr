@@ -44,15 +44,17 @@
     <main class="content">
       {% if flash %}
       <div class="flash flash-{{ flash.level }}" role="status">
-        {{ flash.message }}
+        <span>{{ flash.message }}</span>
         <button class="flash-close" onclick="this.parentElement.remove()">×</button>
       </div>
       {% endif %}
 
       {% if update_notice %}
       <div class="flash flash-info" role="status">
-        Update {{ update_notice.tag }} is available —
-        <a href="/system#updates">install it from the System page</a>.
+        <span>
+          Update {{ update_notice.tag }} is available —
+          <a href="/system#updates">install it from the System page</a>.
+        </span>
         <button class="flash-close" onclick="this.parentElement.remove()">×</button>
       </div>
       {% endif %}
