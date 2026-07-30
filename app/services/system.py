@@ -8,7 +8,13 @@ import socket
 from dataclasses import dataclass
 
 from ..config import settings
-from . import shell
+from . import cache, shell
+
+# Short-lived cache of systemd service states: each state costs two blocking
+# ``systemctl`` shell-outs, and the dashboard, its poll and the health panel all
+# ask for the same handful. Mutating a service below busts its entry so a fresh
+# read never lags a restart/enable.
+_service_cache = cache.TTLCache(settings.service_cache_ttl)
 
 
 @dataclass
@@ -35,6 +41,10 @@ def _systemctl(*args: str) -> shell.Result:
 
 
 def service_state(name: str) -> ServiceState:
+    return _service_cache.get_or_call(name, lambda: _probe_service_state(name))
+
+
+def _probe_service_state(name: str) -> ServiceState:
     if shell.which("systemctl") is None:
         return ServiceState(name, False, False, "unknown")
 
@@ -55,39 +65,41 @@ def service_state(name: str) -> ServiceState:
 
 
 def services() -> list[ServiceState]:
-    return [service_state(name) for name in settings.services]
+    # Each service needs two independent ``systemctl`` shell-outs; querying the
+    # services concurrently turns ~2N sequential waits into ~2, which is the bulk
+    # of the dashboard's load time.
+    return shell.gather([lambda n=name: service_state(n) for name in settings.services])
+
+
+def _act(action: str, name: str) -> shell.Result:
+    """Run a state-changing ``systemctl`` verb and drop the unit's cached state."""
+    if name not in settings.services:
+        return shell.Result(False, 1, "", f"unknown service: {name}")
+    res = _systemctl(action, name)
+    _service_cache.invalidate(name)
+    return res
 
 
 def restart_service(name: str) -> shell.Result:
-    if name not in settings.services:
-        return shell.Result(False, 1, "", f"unknown service: {name}")
-    return _systemctl("restart", name)
+    return _act("restart", name)
 
 
 def enable_service(name: str) -> shell.Result:
     """Enable *name* on boot (used by self-repair to make a fix stick)."""
-    if name not in settings.services:
-        return shell.Result(False, 1, "", f"unknown service: {name}")
-    return _systemctl("enable", name)
+    return _act("enable", name)
 
 
 def start_service(name: str) -> shell.Result:
-    if name not in settings.services:
-        return shell.Result(False, 1, "", f"unknown service: {name}")
-    return _systemctl("start", name)
+    return _act("start", name)
 
 
 def stop_service(name: str) -> shell.Result:
-    if name not in settings.services:
-        return shell.Result(False, 1, "", f"unknown service: {name}")
-    return _systemctl("stop", name)
+    return _act("stop", name)
 
 
 def disable_service(name: str) -> shell.Result:
     """Stop *name* from starting on boot (paired with :func:`stop_service`)."""
-    if name not in settings.services:
-        return shell.Result(False, 1, "", f"unknown service: {name}")
-    return _systemctl("disable", name)
+    return _act("disable", name)
 
 
 def _primary_ip() -> str:

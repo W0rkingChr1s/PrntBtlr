@@ -6,6 +6,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **Pages load noticeably faster.** The dashboard, printers list and System
+  health panel each fired off many blocking shell-outs (`systemctl`, `lpstat`,
+  `scanimage` …) strictly one after another — on a Raspberry Pi that added up to
+  seconds of dead waiting. Independent commands now run concurrently: the
+  dashboard's service list, CUPS status and host info are gathered in parallel,
+  the five service checks no longer queue behind one another, and the health
+  report runs all its control-instance checks at once (so the slow
+  `scanimage -L` probe overlaps the rest instead of stalling everything).
+  Results are still assembled in a fixed order, so nothing on screen shuffles,
+  and the data is exactly as fresh as before — no caching, just less waiting.
+  A redundant duplicate `lpstat -d` call on every dashboard load was also
+  removed.
+- **Slow discovery probes are cached briefly.** The two most expensive,
+  least-volatile shell-outs — systemd service states and SANE scanner discovery
+  (`scanimage -L`, which waits for the USB bus to settle) — are now memoized for
+  a short window instead of re-running on every page load and background poll.
+  Service states are cached for 5s (`PRNTBTLR_SERVICE_CACHE_TTL`) and scanner
+  discovery for 30s (`PRNTBTLR_SCAN_DEVICES_CACHE_TTL`), both tunable and
+  disabled with `0`. Acting on a service from the panel (restart/start/stop/
+  enable/disable) busts its cache immediately, so its state never lags an
+  action.
+
 ### Fixed
 - **PRTG `Services active` channel no longer false-alarms.** The scan-button
   pair (`scanbd` / `prntbtlr-scan-listen`) shares one USB scanner, so exactly

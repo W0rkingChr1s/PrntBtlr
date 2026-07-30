@@ -25,7 +25,7 @@ import shutil
 from dataclasses import dataclass, field
 
 from ..config import settings
-from . import cups, scan, system
+from . import cups, scan, shell, system
 
 # Status vocabulary shared with the templates and the /healthz payload.
 OK = "ok"  # working
@@ -125,11 +125,10 @@ def check_cups() -> Check:
 
 def _core_service_checks() -> list[Check]:
     """One check per required service, minus the scan-button pair."""
+    names = [n for n in settings.services if n not in SCAN_BUTTON_SERVICES]
+    states = shell.gather([lambda n=n: system.service_state(n) for n in names])
     checks: list[Check] = []
-    for name in settings.services:
-        if name in SCAN_BUTTON_SERVICES:
-            continue
-        st = system.service_state(name)
+    for name, st in zip(names, states):
         key = f"service:{name}"
         title = f"Service {name}"
         if st.status in ("not-installed", "unknown"):
@@ -166,7 +165,7 @@ def _core_service_checks() -> list[Check]:
 
 
 def _scan_button_states() -> list[system.ServiceState]:
-    return [system.service_state(n) for n in SCAN_BUTTON_SERVICES]
+    return shell.gather([lambda n=n: system.service_state(n) for n in SCAN_BUTTON_SERVICES])
 
 
 def scan_button_target(states: list[system.ServiceState] | None = None) -> str | None:
@@ -355,13 +354,25 @@ def check_storage() -> Check:
 # Aggregation
 # --------------------------------------------------------------------------- #
 def run_checks() -> HealthReport:
-    """Run every control instance and return the combined report."""
-    checks: list[Check] = [check_network()]
-    checks += _core_service_checks()
-    checks.append(check_cups())
-    checks += check_printers()
-    checks.append(check_scan_button())
-    checks.append(check_scanner())
-    checks.append(check_sharing())
-    checks.append(check_storage())
+    """Run every control instance and return the combined report.
+
+    The checks are independent and each blocks on its own shell-outs — most
+    notably ``scanimage -L``, which alone can take several seconds. Running them
+    concurrently means the report takes about as long as its slowest single
+    check instead of the sum of all of them. Results are reassembled in a fixed
+    order so the page layout never shuffles.
+    """
+    groups = shell.gather(
+        [
+            lambda: [check_network()],
+            _core_service_checks,
+            lambda: [check_cups()],
+            check_printers,
+            lambda: [check_scan_button()],
+            lambda: [check_scanner()],
+            lambda: [check_sharing()],
+            lambda: [check_storage()],
+        ]
+    )
+    checks: list[Check] = [check for group in groups for check in group]
     return HealthReport(checks)

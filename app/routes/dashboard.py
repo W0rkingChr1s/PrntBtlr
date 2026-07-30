@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from ..services import cups, scan, system
+from ..services import cups, scan, shell, system
 from ..templating import render
 
 router = APIRouter()
@@ -12,15 +12,25 @@ router = APIRouter()
 
 @router.get("/")
 def dashboard(request: Request):
-    cups_status = cups.status()
+    # These four are independent and each blocks on its own shell-outs; running
+    # them concurrently makes the dashboard load in about the time of its
+    # slowest source rather than the sum of all four.
+    cups_status, services, host, scans = shell.gather(
+        [
+            cups.status,
+            system.services,
+            system.host_info,
+            lambda: scan.list_scans()[:5],
+        ]
+    )
     return render(
         request,
         "dashboard.html",
         nav_active="dashboard",
         cups=cups_status,
-        services=system.services(),
-        host=system.host_info(),
-        scans=scan.list_scans()[:5],
+        services=services,
+        host=host,
+        scans=scans,
         scan_available=scan.available(),
     )
 

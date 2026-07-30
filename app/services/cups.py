@@ -183,13 +183,14 @@ def _error_policy(name: str) -> str:
 
 
 def list_printers() -> list[Printer]:
-    res = shell.run([settings.cups_lpstat, "-p"])
+    # The queue list, default destination and device URIs are three independent
+    # ``lpstat`` calls — run them together instead of back to back.
+    res, default, uris = shell.gather(
+        [lambda: shell.run([settings.cups_lpstat, "-p"]), _default_printer, _device_uris]
+    )
     printers: list[Printer] = []
     if not res.ok:
         return printers
-
-    default = _default_printer()
-    uris = _device_uris()
 
     for line in res.stdout.splitlines():
         m = _STATE_RE.match(line.strip())
@@ -207,9 +208,12 @@ def list_printers() -> list[Printer]:
                 uri=uris.get(name, ""),
                 is_default=(name == default),
                 enabled=enabled,
-                error_policy=_error_policy(name),
             )
         )
+    # One ``lpoptions`` per queue for its error policy — fetch them concurrently.
+    policies = shell.gather([lambda p=p: _error_policy(p.name) for p in printers])
+    for printer, policy in zip(printers, policies):
+        printer.error_policy = policy
     return printers
 
 
@@ -262,11 +266,14 @@ def status() -> CupsStatus:
             available=False,
             message="CUPS (lpstat) is not installed on this host.",
         )
+    # Printers, jobs and the default destination are independent; gather them so
+    # the dashboard doesn't pay for three sequential CUPS round-trips.
+    printers, jobs, default = shell.gather([list_printers, list_jobs, _default_printer])
     return CupsStatus(
         available=True,
-        printers=list_printers(),
-        jobs=list_jobs(),
-        default_printer=_default_printer(),
+        printers=printers,
+        jobs=jobs,
+        default_printer=default,
     )
 
 
