@@ -290,6 +290,25 @@ def _safe_deliver(hook: Webhook, event_key: str, payload: dict) -> None:
         log.exception("webhook delivery crashed for %s", hook.url)
 
 
+def emit_sync(event_key: str, data: dict | None = None) -> int:
+    """Like :func:`emit`, but deliver inline and return the success count.
+
+    For short-lived, out-of-process callers — the button-scan handler runs as a
+    one-shot process, so the background pool would never get a turn before it
+    exits. Delivery is blocking (bounded by ``webhook_timeout`` per endpoint) and
+    still best-effort: failures are logged, never raised.
+    """
+    try:
+        targets = [h for h in _load() if h.wants(event_key)]
+        if not targets:
+            return 0
+        payload = _build_payload(event_key, data or {})
+        return sum(1 for hook in targets if deliver(hook, event_key, payload)[0])
+    except Exception:
+        log.exception("failed to emit webhook %s", event_key)
+        return 0
+
+
 def send_test(hook_id: str) -> tuple[bool, str]:
     """Deliver a ``webhook.test`` payload to one endpoint and report the result."""
     hook = next((h for h in _load() if h.id == hook_id), None)

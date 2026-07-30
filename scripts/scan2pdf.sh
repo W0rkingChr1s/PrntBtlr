@@ -26,6 +26,11 @@ MODE="${PRNTBTLR_SCAN_MODE:-Color}"   # Color | Gray | Lineart
 PAPER="${PRNTBTLR_SCAN_PAPER:-A4}"    # A4 | Letter | Legal | Max (full bed)
 OCR="${PRNTBTLR_OCR:-0}"
 OCR_LANG="${PRNTBTLR_OCR_LANG:-eng}"
+# Where the app (and its virtualenv) live, so we can fire the same
+# scan.completed webhook browser scans send. Overridable for non-standard
+# installs; if the interpreter isn't there we simply skip the notification.
+APP_DIR="${PRNTBTLR_APP_DIR:-/opt/prntbtlr}"
+PYTHON="${PRNTBTLR_PYTHON:-$APP_DIR/.venv/bin/python}"
 TMP=$(mktemp -d) || exit 1
 cd "$TMP" || exit 1
 
@@ -78,7 +83,19 @@ build_pdf() {
 # nothing or come back truncated. Retry a few times and only accept a real page
 # that converts to a non-empty PDF — an empty/partial scan never wins, and no
 # 0-byte file is left behind.
+# Fire the scan.completed webhook (best-effort, detached so a slow or offline
+# endpoint can't hold up the button-scan handler). Reuses the app's own emitter,
+# so button scans reach the exact same automations as browser scans.
+notify_scan() {
+  [ -x "$PYTHON" ] || return 0
+  ( cd "$APP_DIR" 2>/dev/null &&
+    "$PYTHON" -m app.notify scan.completed \
+      "file=$(basename "$FINAL")" "mode=$MODE" "source=button" \
+      "pages=${1:-1}" "ocr=$OCR" >/dev/null 2>&1 & )
+}
+
 saved=0
+npages=0
 attempt=0
 while [ "$attempt" -lt 4 ]; do
   attempt=$((attempt + 1))
@@ -99,6 +116,7 @@ while [ "$attempt" -lt 4 ]; do
   set -- p_*.tiff
   if [ -e "$1" ] && [ -s "$1" ] && build_pdf; then
     saved=1
+    npages=$#
     break
   fi
 
@@ -129,6 +147,7 @@ fi
 # one step instead of sitting at 0 KB while pages are still being written.
 if cp "$OUT" "$PART" && chmod 664 "$PART" && mv -f "$PART" "$FINAL"; then
   logger -t prntbtlr "scan saved: $FINAL"
+  notify_scan "$npages"
 else
   logger -t prntbtlr "failed to publish scan to $FINAL"
   exit 1
