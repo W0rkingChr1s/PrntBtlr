@@ -50,12 +50,14 @@ def check_credentials(username: str, password: str) -> bool:
     """Validate a login attempt against the configured user + password."""
     if not settings.auth_username or not password:
         return False
-    user_ok = hmac.compare_digest(username, settings.auth_username)
+    # Compare as bytes: compare_digest raises TypeError on non-ASCII str input,
+    # which would turn a stray umlaut in the login form into a 500.
+    user_ok = hmac.compare_digest(username.encode(), settings.auth_username.encode())
 
     if settings.auth_password_hash:
         pass_ok = verify_password(password, settings.auth_password_hash)
     elif settings.auth_password:
-        pass_ok = hmac.compare_digest(password, settings.auth_password)
+        pass_ok = hmac.compare_digest(password.encode(), settings.auth_password.encode())
     else:
         pass_ok = False
     # Evaluate both regardless of user_ok to avoid leaking which field was wrong.

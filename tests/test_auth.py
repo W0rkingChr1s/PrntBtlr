@@ -37,6 +37,19 @@ def test_check_credentials_hashed(monkeypatch):
     assert not auth.check_credentials("admin", "bad")
 
 
+def test_check_credentials_non_ascii_does_not_raise(monkeypatch):
+    # compare_digest rejects non-ASCII str with a TypeError; a stray umlaut in
+    # the login form must fail the check, not crash the request.
+    monkeypatch.setattr(settings, "auth_username", "admin")
+    monkeypatch.setattr(settings, "auth_password", "pw")
+    monkeypatch.setattr(settings, "auth_password_hash", "")
+    assert not auth.check_credentials("ädmin", "pw")
+    assert not auth.check_credentials("admin", "pässwort")
+    monkeypatch.setattr(settings, "auth_username", "ädmin")
+    monkeypatch.setattr(settings, "auth_password", "pässwort")
+    assert auth.check_credentials("ädmin", "pässwort")
+
+
 def test_auth_is_usable(monkeypatch):
     monkeypatch.setattr(settings, "auth_enabled", True)
     monkeypatch.setattr(settings, "auth_password", "")
@@ -95,6 +108,20 @@ def test_login_flow(auth_client):
 
 def test_login_open_redirect_blocked(auth_client):
     auth_client.post("/login", data={"username": "admin", "password": "pw"})
-    r = auth_client.get("/login?next=https://evil.example", follow_redirects=False)
-    # Already logged in → redirect, but never to an off-site target.
-    assert r.headers["location"] in ("/", "/login")
+    for target in ("https://evil.example", "//evil.example", "/\\evil.example"):
+        r = auth_client.get(f"/login?next={target}", follow_redirects=False)
+        # Already logged in → redirect, but never to an off-site target.
+        assert r.headers["location"] in ("/", "/login")
+
+
+def test_login_redirect_preserves_target_query(auth_client):
+    # The next value must be URL-encoded, or the target's own ?query splits
+    # into separate /login parameters and the deep link is truncated.
+    r = auth_client.get("/scans?msg=hello&level=info", follow_redirects=False)
+    assert r.status_code == 303
+    location = r.headers["location"]
+    assert location.startswith("/login?next=")
+    from urllib.parse import parse_qs, urlparse
+
+    params = parse_qs(urlparse(location).query)
+    assert params["next"] == ["/scans?msg=hello&level=info"]

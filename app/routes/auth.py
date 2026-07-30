@@ -13,8 +13,12 @@ router = APIRouter()
 
 
 def _safe_next(target: str | None) -> str:
-    """Only allow same-site relative redirects (no open redirect)."""
-    if target and target.startswith("/") and not target.startswith("//"):
+    """Only allow same-site relative redirects (no open redirect).
+
+    ``//host`` is protocol-relative, and browsers normalize ``/\\host`` to the
+    same thing, so both are rejected.
+    """
+    if target and target.startswith("/") and not target.startswith(("//", "/\\")):
         return target
     return "/"
 

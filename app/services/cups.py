@@ -13,8 +13,15 @@ from dataclasses import dataclass, field
 from ..config import settings
 from . import shell
 
-# ``printer NAME is idle.  enabled since ...`` / ``... is processing ...`` etc.
-_STATE_RE = re.compile(r"^printer\s+(?P<name>\S+)\s+is\s+(?P<state>\w+)\.?\s*(?P<rest>.*)$")
+# ``lpstat -p`` emits three shapes: ``printer NAME is idle.  enabled since ...``,
+# ``printer NAME now printing NAME-7.  enabled since ...`` and (for a paused or
+# error-stopped queue) ``printer NAME disabled since ... -`` — the latter two
+# without the word "is".
+_STATE_RE = re.compile(
+    r"^printer\s+(?P<name>\S+)\s+"
+    r"(?:is\s+(?P<state>\w+)|(?P<printing>now\s+printing\s+\S+)|(?P<disabled>disabled))"
+    r"\.?\s*(?P<rest>.*)$"
+)
 # ``device for NAME: usb://...``
 _DEVICE_RE = re.compile(r"^device for (?P<name>\S+):\s*(?P<uri>.+)$")
 # A queued job line from ``lpstat -o``: ``MX870-7  pi  4096  Wed ...``
@@ -197,7 +204,12 @@ def list_printers() -> list[Printer]:
         if not m:
             continue
         name = m.group("name")
-        state = m.group("state").lower()
+        if m.group("disabled"):
+            state = "disabled"
+        elif m.group("printing"):
+            state = "processing"
+        else:
+            state = m.group("state").lower()
         rest = m.group("rest").strip()
         enabled = "disabled" not in line.lower() and state != "disabled"
         printers.append(

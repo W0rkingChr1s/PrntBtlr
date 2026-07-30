@@ -33,6 +33,38 @@ def test_list_printers_parses_state_and_uri(monkeypatch):
     assert p.error_policy == "retry-job"
 
 
+def test_list_printers_parses_disabled_and_printing(monkeypatch):
+    # lpstat -p has three line shapes; the "now printing" and "disabled" ones
+    # carry no "is" (regression: such queues vanished from the list entirely).
+    responses = {
+        "-p": _result(
+            "printer MX870 is idle.  enabled since Wed 24 Jun 2026\n"
+            "printer Office now printing Office-7.  enabled since Wed 24 Jun 2026\n"
+            "printer Broken disabled since Wed 24 Jun 2026 -\n"
+            "\treason unknown\n"
+        ),
+        "-d": _result("no system default destination\n"),
+        "-v": _result(""),
+    }
+
+    def fake_run(cmd, **kwargs):
+        if cmd[0].endswith("lpstat"):
+            return responses[cmd[1]]
+        return _result("")
+
+    monkeypatch.setattr(cups.shell, "run", fake_run)
+
+    printers = {p.name: p for p in cups.list_printers()}
+    assert set(printers) == {"MX870", "Office", "Broken"}
+    assert printers["MX870"].state == "idle"
+    assert printers["MX870"].enabled is True
+    assert printers["Office"].state == "processing"
+    assert printers["Office"].enabled is True
+    assert printers["Broken"].state == "disabled"
+    assert printers["Broken"].enabled is False
+    assert printers["Broken"].state_label == "paused"
+
+
 def test_list_jobs_parses_and_derives_printer(monkeypatch):
     out = "MX870-7   pi   4096   Wed 24 Jun 2026 10:00:00\n"
     monkeypatch.setattr(cups.shell, "run", lambda cmd, **k: _result(out))
