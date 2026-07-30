@@ -7,6 +7,7 @@ import logging
 import secrets
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -95,7 +96,9 @@ if settings.auth_enabled:
         nxt = request.url.path
         if request.url.query:
             nxt += f"?{request.url.query}"
-        return RedirectResponse(f"/login?next={nxt}", status_code=303)
+        # URL-encode so the target's own ?query stays inside the next value
+        # instead of splitting into separate /login parameters.
+        return RedirectResponse(f"/login?next={quote(nxt, safe='/')}", status_code=303)
 
     secret = settings.session_secret or secrets.token_urlsafe(48)
     if not settings.session_secret:

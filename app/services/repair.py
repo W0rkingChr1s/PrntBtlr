@@ -175,9 +175,23 @@ async def background_loop() -> None:
             if report.repairable:
                 names = ", ".join(c.key for c in report.repairable)
                 log.info("self-repair: acting on %s", names)
-                actions, _ = await asyncio.to_thread(run, report)
+                actions, after = await asyncio.to_thread(run, report)
                 for a in actions:
                     (log.info if a.ok else log.warning)("self-repair: %s — %s", a.title, a.message)
+                if actions:
+                    # Same event the manual "Run self-repair" button emits.
+                    from . import webhooks
+
+                    webhooks.emit(
+                        "repair.performed",
+                        {
+                            "actions": [
+                                {"title": a.title, "ok": a.ok, "message": a.message}
+                                for a in actions
+                            ],
+                            "overall": after.overall,
+                        },
+                    )
         except Exception:
             log.exception("self-repair sweep failed")
         await asyncio.sleep(max(30, settings.self_repair_interval))

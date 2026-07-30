@@ -42,7 +42,12 @@ def render(request: Request, name: str, **context):
 def redirect(path: str, message: str = "", level: str = "success") -> RedirectResponse:
     """Redirect (303) carrying an optional one-shot flash message in the query."""
     if message:
-        path = f"{path}?{urlencode({'msg': message, 'level': level})}"
+        # The query must precede any #fragment (e.g. /system#health), or the
+        # browser treats it as part of the fragment and the flash never arrives.
+        base, _, fragment = path.partition("#")
+        path = f"{base}?{urlencode({'msg': message, 'level': level})}"
+        if fragment:
+            path += f"#{fragment}"
     return RedirectResponse(path, status_code=303)
 
 

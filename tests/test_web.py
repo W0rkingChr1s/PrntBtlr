@@ -65,7 +65,9 @@ def test_healthz_reports_health(client):
 def test_self_repair_runs(client):
     r = client.post("/system/health/repair", follow_redirects=False)
     assert r.status_code == 303
-    assert "/system#health" in r.headers["location"]
+    location = r.headers["location"]
+    assert location.startswith("/system?")  # flash query precedes the fragment
+    assert location.endswith("#health")
 
 
 def test_healthz_payload(client):
