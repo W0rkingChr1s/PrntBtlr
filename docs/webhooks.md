@@ -6,14 +6,15 @@ appears. It's the glue for wiring the panel into [n8n](https://n8n.io),
 [Home Assistant](https://www.home-assistant.io), a Discord/Slack relay, or your
 own script.
 
-This page documents the payload of every event and walks through a ready-to-import
-**n8n recipe**.
+This page documents the payload of every event and walks through ready-to-import
+**n8n** and **Home Assistant** recipes.
 
 - [Setting one up](#setting-one-up)
 - [The request](#the-request) — envelope, headers, signature
 - [Events & payloads](#events--payloads)
 - [Verifying the signature](#verifying-the-signature)
 - [Recipe: n8n → Telegram](#recipe-n8n--telegram)
+- [Recipe: Home Assistant](#recipe-home-assistant)
 - [Configuration](#configuration)
 
 ---
@@ -313,6 +314,68 @@ if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
 // hand the parsed payload downstream under `body`, like the default webhook
 return [{ json: { body: JSON.parse(raw.toString('utf8')) } }];
 ```
+
+---
+
+## Recipe: Home Assistant
+
+Home Assistant receives webhooks through an **automation with a webhook
+trigger** — no add-on required. The `webhook_id` *is* the secret: keep it long
+and unguessable, and leave `local_only` on when the panel and HA share a LAN.
+
+Add this to `automations.yaml` (or **Settings → Automations → ⋮ → Edit in YAML**),
+then reload automations:
+
+```yaml
+alias: PrntBtlr notifications
+trigger:
+  - platform: webhook
+    webhook_id: prntbtlr-CHANGE-ME-to-something-random
+    allowed_methods: [POST]
+    local_only: true # PrntBtlr is on the LAN; set false if HA is reached remotely
+action:
+  - service: notify.notify # or notify.mobile_app_<your-device>
+    data:
+      title: PrntBtlr
+      message: >-
+        {% set e = trigger.json.event %}
+        {% set d = trigger.json.data %}
+        {% if e == 'scan.completed' %}📄 Scan fertig: {{ d.file }}
+        {% elif e == 'print.submitted' %}🖨️ Druck gestartet: Job {{ d.job }} auf {{ d.printer }}
+        {% elif e == 'print.completed' %}✅ Druck fertig: Job {{ d.job }} auf {{ d.printer }}
+        {% elif e == 'printer.added' %}➕ Drucker angelegt: {{ d.name }}
+        {% elif e == 'health.degraded' %}⚠️ Health: {{ d.previous }} → {{ d.overall }}
+        {% elif e == 'health.recovered' %}✅ Health wieder ok ({{ d.previous }} → {{ d.overall }})
+        {% elif e == 'update.available' %}🔔 Update verfügbar: {{ d.tag }}
+        {% elif e == 'webhook.test' %}🧪 Test: {{ d.message }}
+        {% else %}PrntBtlr: {{ e }}{% endif %}
+```
+
+The URL to paste into **PrntBtlr → System → Webhooks** is:
+
+```
+http://<your-ha>:8123/api/webhook/prntbtlr-CHANGE-ME-to-something-random
+```
+
+PrntBtlr sends `Content-Type: application/json`, so the parsed body is available
+to templates as `trigger.json` (and the headers as `trigger.headers`).
+
+### Only notify on some events
+
+Filter in the trigger so the automation fires only for the events you want — say
+finished prints and health problems:
+
+```yaml
+condition:
+  - "{{ trigger.json.event in ['print.completed', 'health.degraded'] }}"
+```
+
+> **Signing.** Home Assistant's webhook trigger can't verify an HMAC signature in
+> a template (Jinja has no HMAC function), so leave the PrntBtlr **secret** empty
+> for this recipe and rely on the unguessable `webhook_id` plus `local_only`. If
+> you need signature verification, terminate the webhook at a reverse proxy (or
+> AppDaemon / pyscript) that checks `X-Prntbtlr-Signature` — see
+> [Verifying the signature](#verifying-the-signature) — then forwards to HA.
 
 ---
 
