@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Form, Request
 
-from ..services import cups, scan
+from ..services import cups, scan, webhooks
 from ..templating import redirect, render
 
 router = APIRouter(prefix="/printers")
@@ -65,6 +65,7 @@ def add_printer(
         )
     res = cups.add_printer(name, uri.strip(), ppd.strip(), shared=shared, retry=retry)
     if res.ok:
+        webhooks.emit("printer.added", {"name": name, "uri": uri.strip(), "shared": shared})
         return redirect("/printers", f"Printer '{name}' created.")
     return redirect("/printers/add", f"Failed to add printer: {res.output}", "error")
 
@@ -73,6 +74,7 @@ def add_printer(
 def delete_printer(name: str):
     res = cups.delete_printer(name)
     if res.ok:
+        webhooks.emit("printer.deleted", {"name": name})
         return redirect("/printers", f"Deleted '{name}'.")
     return redirect("/printers", f"Could not delete '{name}': {res.output}", "error")
 
@@ -101,6 +103,8 @@ def error_policy(name: str, policy: str = Form(...)):
 @router.post("/{name}/test")
 def test_page(name: str):
     res = cups.print_test_page(name)
+    if res.ok:
+        webhooks.emit("print.submitted", {"printer": name, "kind": "test-page"})
     msg = f"Test page sent to '{name}'." if res.ok else f"Failed: {res.output}"
     return redirect("/printers", msg, "success" if res.ok else "error")
 

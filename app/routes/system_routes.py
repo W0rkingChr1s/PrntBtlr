@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Form, Request
 
 from ..config import settings
-from ..services import features, health, repair, system, updater
+from ..services import features, health, repair, system, updater, webhooks
 from ..templating import redirect, render
 
 router = APIRouter(prefix="/system")
@@ -24,6 +24,8 @@ def system_page(request: Request):
         health=health.run_checks(),
         self_repair_enabled=settings.self_repair_enabled,
         feature_list=features.all_features(),
+        webhook_list=webhooks.list_webhooks(),
+        webhook_event_groups=webhooks.EVENT_GROUPS,
     )
 
 
@@ -60,6 +62,13 @@ def health_repair():
     actions, after = repair.run()
     if not actions:
         return redirect("/system#health", "Nothing to repair — everything checks out.")
+    webhooks.emit(
+        "repair.performed",
+        {
+            "actions": [{"title": a.title, "ok": a.ok, "message": a.message} for a in actions],
+            "overall": after.overall,
+        },
+    )
     failed = [a for a in actions if not a.ok]
     done = "; ".join(a.title for a in actions if a.ok)
     if failed:
@@ -120,5 +129,6 @@ def update_apply(tag: str = Form(...)):
         return redirect("/system", "That update is no longer available — check again.", "error")
     res = updater.start_update(tag)
     if res.ok:
+        webhooks.emit("update.applied", {"tag": tag, "from": updater.__version__})
         return redirect("/system", f"Updating to {tag} — the panel will restart shortly.")
     return redirect("/system", f"Update could not start: {res.output}", "error")

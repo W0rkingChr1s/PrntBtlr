@@ -198,6 +198,7 @@ def check_for_update() -> UpdateStatus:
     """Query GitHub, remember the newest release for the channel, return status."""
     state = _load_state()
     channel = state.get("channel") or "stable"
+    prev_tag = (state.get("available") or {}).get("tag")
     try:
         latest = pick_latest(fetch_releases(), channel)
         state["available"] = asdict(latest) if latest and _is_newer(latest.tag) else None
@@ -205,6 +206,16 @@ def check_for_update() -> UpdateStatus:
     except (OSError, ValueError) as exc:
         state["last_error"] = str(exc)
     state["last_check"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    # Fire the webhook only when a *newly* available version appears, so repeated
+    # checks that keep seeing the same release don't re-notify.
+    new_avail = state.get("available")
+    if new_avail and new_avail.get("tag") != prev_tag:
+        from . import webhooks
+
+        webhooks.emit(
+            "update.available",
+            {"tag": new_avail.get("tag"), "version": new_avail.get("version"), "channel": channel},
+        )
     try:
         _save_state(state)
     except OSError as exc:
