@@ -15,7 +15,12 @@ from datetime import datetime
 from pathlib import Path
 
 from ..config import settings
-from . import shell
+from . import cache, shell
+
+# ``scanimage -L`` is the slowest discovery probe (it waits for the USB bus to
+# settle) yet its answer barely changes between refreshes, so a short cache
+# keeps it off the critical path of every page load and health poll.
+_devices_cache = cache.TTLCache(settings.scan_devices_cache_ttl)
 
 # ``device `pixma:MX870_1A2B3C' is a CANON Canon PIXMA MX870 ...``
 _DEVICE_RE = re.compile(r"device `(?P<dev>[^']+)' is a (?P<desc>.+)$")
@@ -134,7 +139,11 @@ def ocr_available() -> bool:
 
 
 def list_devices() -> list[ScanDevice]:
-    """Run ``scanimage -L``. Can take a few seconds while the USB bus settles."""
+    """Run ``scanimage -L`` (cached briefly; can take seconds while USB settles)."""
+    return _devices_cache.get_or_call("scanimage-L", _probe_devices)
+
+
+def _probe_devices() -> list[ScanDevice]:
     res = shell.run([settings.scanimage, "-L"], timeout=settings.command_timeout)
     devices: list[ScanDevice] = []
     if not res.ok:

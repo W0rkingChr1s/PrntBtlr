@@ -19,6 +19,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and the data is exactly as fresh as before — no caching, just less waiting.
   A redundant duplicate `lpstat -d` call on every dashboard load was also
   removed.
+- **Slow discovery probes are cached briefly.** The two most expensive,
+  least-volatile shell-outs — systemd service states and SANE scanner discovery
+  (`scanimage -L`, which waits for the USB bus to settle) — are now memoized for
+  a short window instead of re-running on every page load and background poll.
+  Service states are cached for 5s (`PRNTBTLR_SERVICE_CACHE_TTL`) and scanner
+  discovery for 30s (`PRNTBTLR_SCAN_DEVICES_CACHE_TTL`), both tunable and
+  disabled with `0`. Acting on a service from the panel (restart/start/stop/
+  enable/disable) busts its cache immediately, so its state never lags an
+  action.
 
 ### Fixed
 - **PRTG `Services active` channel no longer false-alarms.** The scan-button

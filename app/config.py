@@ -91,6 +91,20 @@ class Settings(BaseSettings):
     # Scanning can take a while (warm-up + ADF); give it room.
     scan_timeout: int = 300
 
+    # --- Probe caching ----------------------------------------------------
+    # Slow, rarely-changing discovery shell-outs are cached for a short window
+    # so back-to-back page loads and the background polls don't re-run them
+    # every time. Set either to 0 to always probe live.
+    #
+    # systemd service states (systemctl is-active/is-enabled). Kept short so a
+    # service you just (re)started reflects quickly; service actions from the
+    # panel bust the cache immediately regardless.
+    service_cache_ttl: float = 5.0
+    # SANE scanner discovery (``scanimage -L``) — the slowest probe of all, and
+    # a scanner rarely comes or goes between refreshes. Set above the health
+    # panel's poll interval so that poll mostly hits the cache.
+    scan_devices_cache_ttl: float = 30.0
+
     # --- Feature toggles ---------------------------------------------------
     # Which top-level functions of the panel are switched on. Every function
     # ships enabled; the System page lets you turn ones you don't use off, which
