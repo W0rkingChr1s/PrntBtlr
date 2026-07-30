@@ -360,7 +360,7 @@ Events you can subscribe to:
 
 | Event | Fires when |
 | --- | --- |
-| `scan.completed` | a browser scan finishes (payload has the file name) |
+| `scan.completed` | a scan finishes — from the browser **or** the hardware scan button (payload has the file name; button scans add `source: "button"` and the page count) |
 | `printer.added` / `printer.deleted` | a queue is created / removed |
 | `print.submitted` | a test page is sent to a printer |
 | `health.degraded` / `health.recovered` | overall health crosses into warning/failure, or back to ok |
@@ -374,6 +374,12 @@ a secret is set, the body is signed with HMAC-SHA256 in
 header names are case-insensitive). Endpoints persist in
 `/etc/prntbtlr/webhooks.json`; the per-delivery timeout is
 `PRNTBTLR_WEBHOOK_TIMEOUT` (10 s).
+
+Button scans run outside the web app (in `scan2pdf.sh`), so they fire their
+webhook through the app's `python -m app.notify` helper once the PDF is
+published — best-effort and detached, so a slow endpoint never delays the next
+scan. It uses the app virtualenv at `/opt/prntbtlr` by default
+(`PRNTBTLR_PYTHON` / `PRNTBTLR_APP_DIR` override it).
 
 ### Authentication (optional)
 

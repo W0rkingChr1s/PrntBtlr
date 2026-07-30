@@ -39,6 +39,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   but the intentional idle one doesn't.
 
 ### Added
+- **Button scans fire the `scan.completed` webhook too.** Hardware scan-button
+  scans run outside the web app (`scan2pdf.sh`, driven by `scanbd` /
+  `scan-listen.py`), so they previously didn't reach webhooks — only browser
+  scans did. The scan script now emits the same `scan.completed` event once the
+  PDF is published, via a new `python -m app.notify` helper that reuses the
+  app's webhook emitter (same endpoints, signing and delivery). Button-scan
+  payloads add `source: "button"`, the page count and the OCR flag. It's
+  best-effort and detached (uses the app virtualenv at `/opt/prntbtlr`;
+  `PRNTBTLR_PYTHON` / `PRNTBTLR_APP_DIR` override), so a slow or offline endpoint
+  never delays the scan handler. New `app/notify.py` and `webhooks.emit_sync()`.
 - **Outbound webhooks.** A new *Webhooks* card on the System page POSTs a JSON
   payload to any URL when things happen — `scan.completed`, `printer.added` /
   `printer.deleted`, `print.submitted`, `health.degraded` / `health.recovered`,
