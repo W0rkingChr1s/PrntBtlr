@@ -178,6 +178,7 @@ Python:
 ```python
 import hmac, hashlib
 
+
 def valid(raw_body: bytes, header: str, secret: str) -> bool:
     expected = "sha256=" + hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, header or "")
