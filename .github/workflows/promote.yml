@@ -11,7 +11,9 @@ name: Promote beta to stable
 #
 # A beta counts as positive unless it has been marked bad: edit its GitHub
 # release title or notes to contain "[failed]" (or delete the release) and it
-# no longer counts — the panel's beta-channel updater skips it too.
+# no longer counts — the panel's beta-channel updater skips it too. The marker
+# must be plain text: inside a code span it's read as documentation (the
+# changelog explains the convention that way), not as a verdict.
 
 on:
   workflow_dispatch:
@@ -56,7 +58,9 @@ jobs:
               | select(.draft == false and .prerelease == true)
               | select(($since == "") or (.published_at > $since))
               | select(.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-beta\\.[0-9]+$"))
-              | select(((.name // "") + " " + (.body // ""))
+              | select(((.name // "") + "\n" + (.body // ""))
+                       | gsub("```[\\s\\S]*?```"; " ")
+                       | gsub("`[^`]*`"; " ")
                        | ascii_downcase | contains("[failed]") | not)
             ]' <<<"$releases")"
 

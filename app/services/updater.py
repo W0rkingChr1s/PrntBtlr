@@ -9,7 +9,9 @@ survive restarts and updates.
 
 A release whose title or notes contain ``[failed]`` is skipped — the same
 convention the promote workflow uses to decide which betas count towards the
-next stable release.
+next stable release. The marker is only honoured outside code spans, because
+the changelog *documents* the convention and its notes ship verbatim as the
+release body.
 """
 
 from __future__ import annotations
@@ -35,6 +37,9 @@ FAILED_MARKER = "[failed]"
 
 _VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?$")
 _TAG_RE = re.compile(r"^v\d+\.\d+\.\d+(?:-beta\.\d+)?$")
+
+# Fenced blocks first, then inline spans — see _strip_code().
+_CODE_RE = re.compile(r"```[\s\S]*?```|``[^`]*``|`[^`]*`")
 
 # Give the box a moment after boot before the first background check.
 _STARTUP_DELAY = 30
@@ -82,8 +87,20 @@ def _is_newer(tag: str) -> bool:
     return current is None or candidate > current
 
 
+def _strip_code(text: str) -> str:
+    """Drop fenced blocks and inline code spans from markdown."""
+    return _CODE_RE.sub(" ", text)
+
+
 def _is_failed(release: dict) -> bool:
-    text = f"{release.get('name') or ''} {release.get('body') or ''}".lower()
+    """True when a release was deliberately marked bad.
+
+    The marker has to be prose, not code: release notes are generated from the
+    changelog, and the changelog explains the convention by writing the marker
+    as inline code — a naive substring search reads that as "every release is
+    broken" and the panel then never offers an update (it did, for v0.3.0).
+    """
+    text = _strip_code(f"{release.get('name') or ''}\n{release.get('body') or ''}").lower()
     return FAILED_MARKER in text
 
 
