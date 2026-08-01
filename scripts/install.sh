@@ -408,6 +408,10 @@ cp -a "$REPO_DIR/app" "$APP_DIR/"
 cp -a "$REPO_DIR/requirements.txt" "$REPO_DIR/pyproject.toml" "$APP_DIR/" 2>/dev/null || true
 # Self-updater (System → Updates pulls release tarballs and re-runs install.sh).
 install -m 0755 "$REPO_DIR/scripts/update.sh" "$APP_DIR/update.sh"
+# Uninstaller, so removing PrntBtlr never depends on still having the checkout
+# around (the one-liner install may be long gone). It copies itself out of the
+# way before deleting this directory.
+install -m 0755 "$REPO_DIR/scripts/uninstall.sh" "$APP_DIR/uninstall.sh"
 
 # Stamp the version into the *deployed* copy — never into $REPO_DIR, which may
 # be a checkout the user (or bootstrap.sh) reuses and expects to stay clean.
@@ -507,6 +511,7 @@ echo "${c_green}PrntBtlr is installed.${c_off}"
 echo "  Control panel:  http://${IP:-<pi-ip>}:$PORT/"
 echo "  Scans folder:   $SCAN_DIR   (share: smb://${IP:-<pi-ip>}/scans)"
 echo "  Install log:    $LOG_FILE"
+echo "  Uninstall:      sudo $APP_DIR/uninstall.sh   (--dry-run shows what it removes)"
 if [ "${ENABLE_AUTH:-0}" = "1" ]; then
   echo "  Login:          user '${AUTH_USER:-admin}'"
   if [ -n "${AUTH_GENERATED_NOTICE:-}" ]; then
