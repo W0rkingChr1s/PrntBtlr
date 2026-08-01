@@ -479,11 +479,32 @@ a locked-down share.
 ## 🧹 Uninstall
 
 ```bash
-sudo ./scripts/uninstall.sh                 # remove the panel + service
-sudo PURGE_CONFIG=1 ./scripts/uninstall.sh  # also remove udev rule + scan script
+sudo /opt/prntbtlr/uninstall.sh --dry-run   # show exactly what would be removed
+sudo /opt/prntbtlr/uninstall.sh             # remove PrntBtlr
 ```
 
-Your scans in `/srv/scans` are left untouched.
+(From a clone it's `sudo ./scripts/uninstall.sh` — same script.)
+
+It is the mirror image of the installer and undoes everything it set up: both
+services, `/opt/prntbtlr`, the udev rule, the scanbd scripts + button config
+including the `include(…)` line in `scanbd.conf`, the `[scans]` Samba share and
+the panel's firewall rule. Files it edited are backed up as
+`<file>.bak.<timestamp>` before the PrntBtlr block is cut out, so anything you
+added next to it survives — and a `[scans]` share that wasn't written by
+PrntBtlr is left alone.
+
+**Your scans, your config and CUPS/SANE/Samba stay** unless you ask for more:
+
+| Flag | Also removes |
+|------|--------------|
+| `--purge-config` | `/etc/prntbtlr` — env file, feature flags, webhooks, updater state |
+| `--purge-scans` | the scans folder and everything in it |
+| `--purge-packages` | CUPS, SANE, scanbd, Samba — **including the printers you set up in CUPS** |
+| `--all` | all three of the above |
+| `-y, --yes` | don't ask for confirmation (needed when running non-interactively) |
+
+Every flag has an environment twin (`PURGE_CONFIG=1`, `DRY_RUN=1`, …), so the
+older `sudo PURGE_CONFIG=1 ./scripts/uninstall.sh` form still works.
 
 ---
 

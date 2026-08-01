@@ -6,6 +6,34 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **An uninstaller that actually mirrors the installer.** `uninstall.sh` had
+  been stuck at what the installer looked like early on: it stopped the panel
+  service and deleted `/opt/prntbtlr`, but knew nothing about the scan-button
+  listener unit, and it explicitly told you to go remove the Samba `[scans]`
+  block and the `scanbd.conf` include by hand. Removing PrntBtlr therefore left
+  a service unit, a share pointing at a folder nothing filled any more, and an
+  include for a config file that was gone. It now undoes the install end to end
+  — both units, `/opt/prntbtlr` + the bootstrap checkout, the udev rule, the
+  scanbd scripts and button config, the `[scans]` share, the panel's ufw rule
+  and PrntBtlr's log files:
+  - **Config files are edited, not restored.** `smb.conf` and `scanbd.conf`
+    hold your settings too, so only PrntBtlr's own block is cut out (a `[scans]`
+    share it didn't write is recognised and left alone), and the file is backed
+    up as `<file>.bak.<timestamp>` first.
+  - **Your data isn't collateral.** Scans, `/etc/prntbtlr` and the
+    CUPS/SANE/Samba packages stay unless you pass `--purge-scans`,
+    `--purge-config` or `--purge-packages` (`--all` for all three). A scan
+    folder pointed at a system directory is refused rather than deleted.
+  - **`--dry-run` prints the whole plan without touching anything**, and the
+    run asks for confirmation unless `--yes` is given — non-interactive runs
+    without it stop instead of guessing.
+  - It no longer deletes the script it is running from: bash reads a script
+    lazily, so `sudo /opt/prntbtlr-src/scripts/uninstall.sh` used to truncate
+    itself mid-run. It now copies itself out of the tree and continues.
+  - `install.sh` deploys it to `/opt/prntbtlr/uninstall.sh`, so a one-liner
+    install can be removed without still having the checkout around.
+
 ### Fixed
 - **A bootstrap install reported version 0.1.0.** `bootstrap.sh` clones the
   default branch and runs the installer, which deployed the tree as-is — and
