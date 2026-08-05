@@ -1,6 +1,14 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
-jinja2>=3.1
-python-multipart>=0.0.9
-pydantic-settings>=2.2
+# jinja2 <3.1.6 is vulnerable to CVE-2024-22195, CVE-2024-34064, CVE-2024-56201,
+# CVE-2024-56326, and CVE-2025-27516 (sandbox breakout via the `attr` filter).
+jinja2>=3.1.6
+# python-multipart <0.0.22 is vulnerable to GHSA-wp53-j4wj-2cfg / CVE-2026-24486
+# (arbitrary file write, HIGH severity) plus several DoS/parsing issues fixed
+# progressively through 0.0.26/0.0.27/0.0.30/0.0.31.
+python-multipart>=0.0.32
+# pydantic-settings 2.12.0-2.14.1 is vulnerable to GHSA-4xgf-cpjx-pc3j /
+# CVE-2026-58203 (NestedSecretsSettingsSource follows symlinks outside
+# secrets_dir, local file read), fixed in 2.14.2.
+pydantic-settings>=2.14.2
 itsdangerous>=2.1
