@@ -1,6 +1,11 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
-jinja2>=3.1
-python-multipart>=0.0.9
+# jinja2 <3.1.6 is vulnerable to CVE-2025-27516, CVE-2024-56201, CVE-2024-22195,
+# CVE-2024-34064, CVE-2024-56326 (sandbox breakout / HTML attribute injection).
+jinja2>=3.1.6
+# python-multipart <0.0.22 is vulnerable to CVE-2024-53981, CVE-2026-24486,
+# CVE-2026-53539, CVE-2026-53538, CVE-2026-40347, CVE-2026-42561,
+# CVE-2026-53540, CVE-2026-53537 (multiple DoS via malformed multipart data).
+python-multipart>=0.0.32
 pydantic-settings>=2.2
 itsdangerous>=2.1
