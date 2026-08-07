@@ -14,6 +14,9 @@ python-multipart>=0.0.9; python_version < "3.10"
 python-multipart>=0.0.32; python_version >= "3.10"
 # pydantic-settings 2.12.0-2.14.1 is vulnerable to GHSA-4xgf-cpjx-pc3j /
 # CVE-2026-58203 (NestedSecretsSettingsSource follows symlinks outside
-# secrets_dir, local file read), fixed in 2.14.2.
-pydantic-settings>=2.14.2
+# secrets_dir, local file read), fixed in 2.14.2. pydantic-settings 2.12.0+
+# dropped Python 3.9 support, so 3.9 can't reach the vulnerable range at all —
+# its unchanged >=2.2 floor tops out at 2.11.0, below where the bug exists.
+pydantic-settings>=2.2; python_version < "3.10"
+pydantic-settings>=2.14.2; python_version >= "3.10"
 itsdangerous>=2.1
