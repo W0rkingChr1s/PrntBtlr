@@ -1,6 +1,9 @@
 -r requirements.txt
 # pytest 9 dropped Python 3.9; keep a 3.9-compatible pin for that interpreter so
 # the CI matrix (which still covers 3.9 / Raspberry Pi OS Bullseye) stays green.
-pytest>=8.0,<9; python_version < "3.10"
+# NOTE: CVE-2025-71176 (insecure tmpdir handling) is only fixed in pytest>=9.0.3,
+# so the 3.9 branch below cannot be fully remediated without dropping 3.9 support.
+# Low severity here: pytest is a test-only dependency, not shipped to production.
+pytest>=8.4.2,<9; python_version < "3.10"
 pytest>=9.1.1; python_version >= "3.10"
 httpx>=0.28.1
