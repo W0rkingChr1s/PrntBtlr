@@ -45,7 +45,15 @@ addopts = "-q"
 
 [build-system]
 # setuptools>=83.0.0 fixes PYSEC-2026-3447 (Unicode-normalization bypass of
-# MANIFEST.in exclude/prune rules when building sdists on macOS APFS/HFS+).
-# Floor bumped to the current PyPI release for routine currency.
-requires = ["setuptools>=84.0.0"]
+# MANIFEST.in exclude/prune rules when building sdists on macOS APFS/HFS+), but also
+# dropped Python 3.9 support in that same release. A floor of >=84.0.0 (or >=83.0.0) is
+# uninstallable on Python 3.9 (Raspberry Pi OS Bullseye), which breaks `pip install .`
+# from sdist there. Split by python_version, matching the pattern used for the runtime
+# deps above: float to latest on 3.10+, keep the newest 3.9-compatible release (82.0.1)
+# on 3.9 - which leaves PYSEC-2026-3447 open on that interpreter (build-time only, and
+# it requires a crafted MANIFEST.in, not attacker-controlled input at install time).
+requires = [
+    "setuptools>=84.0.0; python_version >= '3.10'",
+    "setuptools>=68,<=82.0.1; python_version < '3.10'",
+]
 build-backend = "setuptools.build_meta"
