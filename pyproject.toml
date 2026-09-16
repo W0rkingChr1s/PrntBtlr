@@ -12,7 +12,7 @@ dependencies = [
     # for the full CVE list and rationale.
     "fastapi>=0.141.1; python_version >= '3.10'",
     "fastapi>=0.110,<=0.128.8; python_version < '3.10'",
-    "uvicorn[standard]>=0.52.4; python_version >= '3.10'",
+    "uvicorn[standard]>=0.53.0; python_version >= '3.10'",
     "uvicorn[standard]>=0.29,<=0.39.0; python_version < '3.10'",
     "jinja2>=3.1.6",
     "python-multipart>=0.0.32; python_version >= '3.10'",
