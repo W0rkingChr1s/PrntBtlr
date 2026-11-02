@@ -5,5 +5,5 @@
 # on this <9 branch since it can never reach the fix; dev-only dependency, so exploiting
 # it requires local/multi-user access to the machine running the test suite.
 pytest>=8.4.2,<9; python_version < "3.10"
-pytest>=9.1.1; python_version >= "3.10"
+pytest>=9.2.0; python_version >= "3.10"
 httpx>=0.28.1
